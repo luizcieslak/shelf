@@ -1,17 +1,13 @@
 import { makeAutoObservable } from 'mobx'
 import type PocketBase from 'pocketbase'
-import { SpotifyService } from '../services/spotify'
-import type { AuthResponse, User } from '../types/auth'
-import type { SpotifyPlaylist } from '../types/spotify'
+import type { AuthResponse } from '../types/auth'
+import type { Platform, PlatformAuth } from '../types/platform'
 
 export class AuthStore {
-	// Observable state
-	user: User | null = null
-	spotifyAccessToken: string | null = null
-	isLoading = false
-	error: string | null = null
-	playlists: SpotifyPlaylist[] = []
-	playlistsLoading = false
+	// Platform-specific authentication states
+	spotify: PlatformAuth | null = null
+	apple: PlatformAuth | null = null
+	google: PlatformAuth | null = null
 
 	// PocketBase instance
 	private pb: PocketBase
@@ -19,28 +15,36 @@ export class AuthStore {
 	constructor(pb: PocketBase) {
 		makeAutoObservable(this)
 		this.pb = pb
-
-		// Initialize from existing PocketBase session
-		this.user = pb.authStore.model
 	}
 
 	// Computed values
-	get isAuthenticated() {
-		return this.user !== null
+	get connectedPlatforms(): Platform[] {
+		const connected: Platform[] = []
+		if (this.spotify) connected.push('spotify')
+		if (this.apple) connected.push('apple')
+		if (this.google) connected.push('google')
+		return connected
 	}
 
-	get hasSpotifyToken() {
-		return this.spotifyAccessToken !== null
+	get hasAnyConnection(): boolean {
+		return this.connectedPlatforms.length > 0
 	}
 
-	get canFetchPlaylists() {
-		return this.isAuthenticated && this.hasSpotifyToken
+	get isAnyLoading(): boolean {
+		return this.spotify?.isLoading || this.apple?.isLoading || this.google?.isLoading || false
 	}
 
 	// Actions
-	async loginWithSpotify() {
-		this.isLoading = true
-		this.error = null
+	async connectSpotify() {
+		// Set loading state
+		this.spotify = {
+			user: null!,
+			accessToken: '',
+			isLoading: true,
+			error: null,
+			playlists: [],
+			playlistsLoading: false,
+		}
 
 		try {
 			const authData: AuthResponse = await this.pb.collection('users').authWithOAuth2({
@@ -53,58 +57,104 @@ export class AuthStore {
 				],
 			})
 
-			// Update observable state
-			this.user = authData.record
-			this.spotifyAccessToken = authData.meta?.accessToken || null
-
-			// Automatically fetch playlists if we have a token
-			if (this.spotifyAccessToken) {
-				await this.fetchPlaylists()
+			// Update Spotify auth state
+			this.spotify = {
+				user: authData.record,
+				accessToken: authData.meta?.accessToken || '',
+				refreshToken: authData.meta?.refreshToken,
+				isLoading: false,
+				error: null,
+				playlists: [],
+				playlistsLoading: false,
 			}
 		} catch (err) {
-			console.error('OAuth login error:', err)
-			this.error = 'Failed to sign in with Spotify. Please try again.'
-		} finally {
-			this.isLoading = false
+			console.error('Spotify OAuth error:', err)
+			this.spotify = {
+				user: null!,
+				accessToken: '',
+				isLoading: false,
+				error: 'Failed to connect to Spotify. Please try again.',
+				playlists: [],
+				playlistsLoading: false,
+			}
 		}
 	}
 
-	async fetchPlaylists() {
-		if (!this.spotifyAccessToken) {
-			this.error = 'No Spotify access token available'
-			return
+	async connectGoogle() {
+		// Set loading state
+		this.google = {
+			user: null!,
+			accessToken: '',
+			isLoading: true,
+			error: null,
+			playlists: [],
+			playlistsLoading: false,
 		}
-
-		this.playlistsLoading = true
-		this.error = null
 
 		try {
-			const spotifyService = new SpotifyService(this.spotifyAccessToken)
-			const response = await spotifyService.getCurrentUserPlaylists()
-			this.playlists = response.items
+			const authData: AuthResponse = await this.pb.collection('users').authWithOAuth2({
+				provider: 'google',
+				scopes: [
+					'https://www.googleapis.com/auth/youtube',
+					'https://www.googleapis.com/auth/youtube.readonly',
+				],
+			})
+
+			// Update Google auth state
+			this.google = {
+				user: authData.record,
+				accessToken: authData.meta?.accessToken || '',
+				refreshToken: authData.meta?.refreshToken,
+				isLoading: false,
+				error: null,
+				playlists: [],
+				playlistsLoading: false,
+			}
 		} catch (err) {
-			console.error('Error fetching playlists:', err)
-			this.error = 'Failed to load playlists'
-		} finally {
-			this.playlistsLoading = false
+			console.error('Google OAuth error:', err)
+			this.google = {
+				user: null!,
+				accessToken: '',
+				isLoading: false,
+				error: 'Failed to connect to Google. Please try again.',
+				playlists: [],
+				playlistsLoading: false,
+			}
 		}
 	}
 
-	logout() {
-		// Clear PocketBase auth
-		this.pb.authStore.clear()
-
-		// Clear observable state
-		this.user = null
-		this.spotifyAccessToken = null
-		this.playlists = []
-		this.error = null
-		this.isLoading = false
-		this.playlistsLoading = false
+	async connectApple() {
+		// Apple Music connection - to be implemented later
+		console.log('Apple Music connection - coming soon!')
 	}
 
-	// Clear error message
-	clearError() {
-		this.error = null
+	disconnectPlatform(platform: Platform) {
+		switch (platform) {
+			case 'spotify':
+				this.spotify = null
+				break
+			case 'google':
+				this.google = null
+				break
+			case 'apple':
+				this.apple = null
+				break
+		}
+	}
+
+	disconnectAll() {
+		this.spotify = null
+		this.apple = null
+		this.google = null
+		// Clear PocketBase session if no platforms connected
+		this.pb.authStore.clear()
+	}
+
+	// Clear error for specific platform
+	clearError(platform: Platform) {
+		const platformAuth = this[platform]
+		if (platformAuth) {
+			platformAuth.error = null
+		}
 	}
 }
