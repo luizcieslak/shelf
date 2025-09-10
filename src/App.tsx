@@ -1,29 +1,12 @@
-import PocketBase from 'pocketbase'
-import { useState } from 'react'
+import { observer } from 'mobx-react-lite'
 import LoginScreen from './components/LoginScreen'
 import PlaylistGrid from './components/PlaylistGrid'
-import type { AuthResponse, User } from './types/auth'
+import { useStores } from './stores/StoreContext'
 
-const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0.1:8090')
+const App = observer(() => {
+	const { authStore } = useStores()
 
-function App() {
-	const [user, setUser] = useState<User | null>(pb.authStore.model)
-	const [authData, setAuthData] = useState<AuthResponse | null>(null)
-
-	const handleLogin = (authResponse: AuthResponse) => {
-		setUser(authResponse.record)
-		setAuthData(authResponse)
-	}
-
-	const handleLogout = () => {
-		pb.authStore.clear()
-		setUser(null)
-		setAuthData(null)
-	}
-
-	if (user) {
-		const spotifyAccessToken = authData?.meta?.accessToken
-
+	if (authStore.isAuthenticated) {
 		return (
 			<div className='min-h-screen bg-gray-50'>
 				<div className='max-w-7xl mx-auto py-8 px-4'>
@@ -33,21 +16,37 @@ function App() {
 							<h1 className='text-3xl font-bold text-gray-900'>Welcome to Shelf!</h1>
 							<p className='mt-1 text-gray-600'>
 								Signed in as:{' '}
-								<span className='font-semibold text-blue-600'>{user.email || user.username}</span>
+								<span className='font-semibold text-blue-600'>
+									{authStore.user?.email || authStore.user?.username}
+								</span>
 							</p>
 						</div>
 						<button
 							type='button'
-							onClick={handleLogout}
+							onClick={() => authStore.logout()}
 							className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
 						>
 							Sign Out
 						</button>
 					</div>
 
+					{/* Error display */}
+					{authStore.error && (
+						<div className='mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md'>
+							<p>{authStore.error}</p>
+							<button
+								type='button'
+								onClick={() => authStore.clearError()}
+								className='text-sm underline hover:no-underline'
+							>
+								Dismiss
+							</button>
+						</div>
+					)}
+
 					{/* Content */}
-					{spotifyAccessToken ? (
-						<PlaylistGrid accessToken={spotifyAccessToken} />
+					{authStore.hasSpotifyToken ? (
+						<PlaylistGrid />
 					) : (
 						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
 							<p>
@@ -60,7 +59,7 @@ function App() {
 		)
 	}
 
-	return <LoginScreen pb={pb} onLogin={handleLogin} />
-}
+	return <LoginScreen />
+})
 
 export default App

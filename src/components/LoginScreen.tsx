@@ -1,32 +1,11 @@
-import type PocketBase from 'pocketbase'
-import { useState } from 'react'
-import type { AuthResponse } from '../types/auth'
+import { observer } from 'mobx-react-lite'
+import { useStores } from '../stores/StoreContext'
 
-interface LoginScreenProps {
-	pb: PocketBase
-	onLogin: (authResponse: AuthResponse) => void
-}
+const LoginScreen = observer(() => {
+	const { authStore } = useStores()
 
-const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
-	const [isLoading, setIsLoading] = useState(false)
-	const [error, setError] = useState('')
-
-	const handleOAuthLogin = async (provider: 'google' | 'apple' | 'spotify') => {
-		setIsLoading(true)
-		setError('')
-
-		try {
-			const authData = await pb.collection('users').authWithOAuth2({
-				provider,
-				scopes: ['playlist-read-private', 'playlist-modify-private', 'playlist-read-collaborative', 'user-read-email'],
-			})
-			onLogin(authData)
-		} catch (err) {
-			console.error('OAuth login error:', err)
-			setError(`Failed to sign in with ${provider}. Please try again.`)
-		} finally {
-			setIsLoading(false)
-		}
+	const handleSpotifyLogin = () => {
+		authStore.loginWithSpotify()
 	}
 
 	return (
@@ -37,9 +16,9 @@ const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
 					<p className='mt-2 text-gray-600'>Sign in to your account</p>
 				</div>
 
-				{error && (
+				{authStore.error && (
 					<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm'>
-						{error}
+						{authStore.error}
 					</div>
 				)}
 
@@ -47,8 +26,8 @@ const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
 					{/* Spotify Sign In */}
 					<button
 						type='button'
-						onClick={() => handleOAuthLogin('spotify')}
-						disabled={isLoading}
+						onClick={handleSpotifyLogin}
+						disabled={authStore.isLoading}
 						className='w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
 					>
 						<svg className='w-5 h-5 mr-3' viewBox='0 0 24 24' fill='currentColor'>
@@ -62,7 +41,7 @@ const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
 					</p>
 				</div>
 
-				{isLoading && (
+				{authStore.isLoading && (
 					<div className='text-center'>
 						<div className='inline-flex items-center px-4 py-2 text-sm text-gray-600'>
 							<svg className='animate-spin -ml-1 mr-3 h-4 w-4' viewBox='0 0 24 24'>
@@ -92,6 +71,6 @@ const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
 			</div>
 		</div>
 	)
-}
+})
 
 export default LoginScreen

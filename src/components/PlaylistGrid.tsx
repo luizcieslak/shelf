@@ -1,36 +1,10 @@
-import { useEffect, useState } from 'react'
-import { SpotifyService } from '../services/spotify'
-import type { SpotifyPlaylist } from '../types/spotify'
+import { observer } from 'mobx-react-lite'
+import { useStores } from '../stores/StoreContext'
 
-interface PlaylistGridProps {
-	accessToken: string
-}
+const PlaylistGrid = observer(() => {
+	const { authStore } = useStores()
 
-const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
-	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
-	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
-
-	useEffect(() => {
-		const fetchPlaylists = async () => {
-			try {
-				setLoading(true)
-				const spotifyService = new SpotifyService(accessToken)
-				const response = await spotifyService.getCurrentUserPlaylists()
-				setPlaylists(response.items)
-				console.log('playlists:', response.items)
-			} catch (err) {
-				console.error('Error fetching playlists:', err)
-				setError('Failed to load playlists')
-			} finally {
-				setLoading(false)
-			}
-		}
-
-		fetchPlaylists()
-	}, [accessToken])
-
-	if (loading) {
+	if (authStore.playlistsLoading) {
 		return (
 			<div className='flex justify-center items-center py-8'>
 				<div className='animate-spin h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full' />
@@ -38,15 +12,19 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 		)
 	}
 
-	if (error) {
-		return <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md'>{error}</div>
+	if (authStore.error) {
+		return (
+			<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md'>
+				{authStore.error}
+			</div>
+		)
 	}
 
 	return (
 		<div className='space-y-6'>
 			<h2 className='text-2xl font-bold text-gray-900'>Your Spotify Playlists</h2>
 			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-				{playlists.map(playlist => (
+				{authStore.playlists.map(playlist => (
 					<div
 						key={playlist.id}
 						className='bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow'
@@ -81,6 +59,6 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 			</div>
 		</div>
 	)
-}
+})
 
 export default PlaylistGrid
