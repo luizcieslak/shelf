@@ -9,4 +9,9 @@ export interface User {
 export interface AuthResponse {
 	record: User
 	token: string
+	meta?: {
+		accessToken?: string
+		refreshToken?: string
+		rawUser?: Record<string, unknown>
+	}
 }
