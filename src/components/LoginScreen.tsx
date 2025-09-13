@@ -18,7 +18,13 @@ const LoginScreen = ({ pb, onLogin }: LoginScreenProps) => {
 		try {
 			const authData = await pb.collection('users').authWithOAuth2({
 				provider,
-				scopes: ['playlist-read-private', 'playlist-modify-private', 'playlist-read-collaborative', 'user-read-email'],
+				scopes: [
+					'playlist-read-private',
+					'playlist-modify-private',
+					'playlist-read-collaborative',
+					'playlist-modify-public',
+					'user-read-email',
+				],
 			})
 			onLogin(authData)
 		} catch (err) {
