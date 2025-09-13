@@ -9,6 +9,7 @@ export interface SpotifyPlaylist {
 	}>
 	tracks: {
 		total: number
+		href: string
 	}
 	public: boolean
 	collaborative: boolean
@@ -28,4 +29,48 @@ export interface SpotifyPlaylistsResponse {
 	offset: number
 	next: string | null
 	previous: string | null
+}
+
+export interface SpotifyPlaylistTracksResponse {
+	items: PlaylistTrackItem[]
+	total: number
+	limit: number
+	offset: number
+	href: string
+}
+
+export interface PlaylistTrackItem {
+	added_at: string
+	track: SpotifyTrack
+}
+
+export interface SpotifyTrack {
+	id: string
+	name: string
+	uri: string
+	duration_ms: number
+	explicit: boolean
+	artists: SpotifyArtist[]
+	album: SpotifyAlbum
+	preview_url: string | null
+}
+
+export interface SpotifyArtist {
+	id: string
+	name: string
+	uri: string
+}
+
+export interface SpotifyAlbum {
+	id: string
+	name: string
+	release_date: string
+	images: SpotifyImage[]
+}
+
+// If you don't already have this type defined
+export interface SpotifyImage {
+	url: string
+	height: number | null
+	width: number | null
 }
