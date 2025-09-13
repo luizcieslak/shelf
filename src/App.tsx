@@ -2,6 +2,7 @@ import { observer } from 'mobx-react-lite'
 import LoginScreen from './components/LoginScreen'
 import { useStores } from './stores/StoreContext'
 import type { Platform } from './types/platform'
+import PlaylistGrid from './components/PlaylistGrid'
 
 const App = observer(() => {
 	const { authStore } = useStores()
@@ -135,6 +136,16 @@ const App = observer(() => {
 							</div>
 						)}
 					</div>
+						{/* Content */}
+					{authStore.spotify?.accessToken ? (
+						<PlaylistGrid accessToken={authStore.spotify?.accessToken} />
+					) : (
+						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
+							<p>
+								<strong>Note:</strong> To view your Spotify playlists, please sign in with Spotify.
+							</p>
+						</div>
+					)}
 				</div>
 			</div>
 		)
