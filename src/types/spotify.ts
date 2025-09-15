@@ -74,3 +74,12 @@ export interface SpotifyImage {
 	height: number | null
 	width: number | null
 }
+
+export interface SpotifySearchResponse {
+	tracks: {
+		items: SpotifyTrack[]
+		total: number
+		limit: number
+		offset: number
+	}
+}
