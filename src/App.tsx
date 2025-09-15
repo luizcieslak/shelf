@@ -4,6 +4,8 @@ import { useStores } from './stores/StoreContext'
 import type { Platform } from './types/platform'
 import SpotifyPlaylistGrid from './components/spotify/PlaylistGrid'
 import SpotifySearch from './components/spotify/Search'
+import YouTubePlaylistGrid from './components/youtube/YouTubePlaylistGrid'
+import YouTubeSearch from './components/youtube/YoutubeSearch'
 
 const App = observer(() => {
 	const { authStore } = useStores()
@@ -146,6 +148,19 @@ const App = observer(() => {
 						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
 							<p>
 								<strong>Note:</strong> To view your Spotify playlists, please sign in with Spotify.
+							</p>
+						</div>
+					)}
+
+					{authStore.google?.accessToken ? (
+						<>
+							<YouTubePlaylistGrid accessToken={authStore.google.accessToken} />
+							<YouTubeSearch accessToken={authStore.google.accessToken} />
+						</>
+					) : (
+						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
+							<p>
+								<strong>Note:</strong> To view your YouTube playlists, please sign in with Google.
 							</p>
 						</div>
 					)}
