@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { SpotifyService } from '../services/spotify'
-import type { SpotifyTrack } from '../types/spotify'
+import { SpotifyService } from '../../services/spotify'
+import type { SpotifyTrack } from '../../types/spotify'
 
 interface SearchProps {
 	accessToken: string

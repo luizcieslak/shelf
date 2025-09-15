@@ -1,4 +1,8 @@
-import type { SpotifyPlaylistsResponse, SpotifyPlaylistTracksResponse } from '../types/spotify'
+import type {
+	SpotifyPlaylistsResponse,
+	SpotifyPlaylistTracksResponse,
+	SpotifySearchResponse,
+} from '../types/spotify'
 
 export class SpotifyService {
 	private accessToken: string

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { SpotifyService } from '../services/spotify'
-import type { SpotifyPlaylist, SpotifyTrack } from '../types/spotify'
+import { SpotifyService } from '../../services/spotify'
+import type { SpotifyPlaylist, SpotifyTrack } from '../../types/spotify'
 
 interface PlaylistGridProps {
 	accessToken: string
