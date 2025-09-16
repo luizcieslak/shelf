@@ -1,21 +1,9 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.2.3/schema.json",
-	"files": {
-		"includes": ["src/**/*.ts", "src/**/*.tsx", "*.js", "*.ts", "*.json"]
-	},
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
-			"a11y": {
-				"noSvgWithoutTitle": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "warn"
-			},
-			"style": {
-				"noNonNullAssertion": "warn"
-			}
+			"recommended": true
 		}
 	},
 	"formatter": {
