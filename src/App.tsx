@@ -1,10 +1,9 @@
 import { observer } from 'mobx-react-lite'
-import LoginScreen from './components/LoginScreen'
-import SpotifyPlaylistGrid from './components/spotify/PlaylistGrid'
-import SpotifySearch from './components/spotify/Search'
-import YouTubePlaylistGrid from './components/youtube/YouTubePlaylistGrid'
-import YouTubeSearch from './components/youtube/YoutubeSearch'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
 import { useStores } from './stores/StoreContext'
+import Login from './pages/Login'
+import Playlists from './pages/Playlists'
+import Search from './pages/Search'
 import type { Platform } from './types/platform'
 
 const App = observer(() => {
@@ -73,107 +72,61 @@ const App = observer(() => {
 		}
 	}
 
-	if (authStore.hasAnyConnection) {
-		return (
-			<div className='min-h-screen bg-gray-50'>
-				<div className='max-w-7xl mx-auto py-8 px-4'>
-					{/* Header */}
-					<div className='mb-8 bg-white p-6 rounded-lg shadow-md'>
-						<div className='flex justify-between items-start mb-4'>
-							<div>
-								<h1 className='text-3xl font-bold text-gray-900'>Shelf</h1>
-								<p className='mt-1 text-gray-600'>Transfer playlists between music platforms</p>
-							</div>
-							<button
-								type='button'
-								onClick={() => authStore.disconnectAll()}
-								className='px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500'
-							>
-								Disconnect All
-							</button>
-						</div>
-
-						{/* Connected Platforms */}
-						<div>
-							<h3 className='text-lg font-medium text-gray-900 mb-3'>Connected Platforms</h3>
-							<div className='flex gap-3'>
-								{authStore.connectedPlatforms.map(platform => {
-									const platformAuth = authStore[platform]
-									return (
-										<div
-											key={platform}
-											className={`flex items-center gap-2 px-3 py-2 rounded-lg ${getPlatformColor(platform)}`}
-										>
-											{getPlatformIcon(platform)}
-											<span className='font-medium'>{getPlatformName(platform)}</span>
-											<span className='text-sm opacity-75'>
-												{platformAuth?.user?.email || platformAuth?.user?.username}
-											</span>
-											<button
-												type='button'
-												onClick={() => authStore.disconnectPlatform(platform)}
-												className='ml-2 text-red-600 hover:text-red-800'
-												title={`Disconnect ${getPlatformName(platform)}`}
-											>
-												×
-											</button>
-										</div>
-									)
-								})}
-							</div>
-						</div>
+	const Navigation = () => (
+		<nav className="bg-white shadow-sm border-b">
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div className="flex justify-between h-16">
+					<div className="flex items-center space-x-8">
+						<h1 className="text-xl font-bold text-gray-900">Shelf</h1>
+						<Link to="/playlists" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
+							Playlists
+						</Link>
+						<Link to="/search" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
+							Search
+						</Link>
 					</div>
-
-					{/* Content Area */}
-					<div className='bg-white p-6 rounded-lg shadow-md'>
-						<h2 className='text-xl font-semibold text-gray-900 mb-4'>Playlist Transfer</h2>
-
-						{authStore.connectedPlatforms.length === 1 ? (
-							<div className='text-center py-8'>
-								<p className='text-gray-600 mb-4'>Connect another platform to start transferring playlists</p>
-								<LoginScreen />
-							</div>
-						) : (
-							<div className='text-center py-8'>
-								<p className='text-gray-600 mb-4'>Playlist transfer functionality coming soon!</p>
-								<p className='text-sm text-gray-500'>
-									You have {authStore.connectedPlatforms.length} platforms connected
-								</p>
-							</div>
-						)}
+					<div className="flex items-center space-x-4">
+						<div className="flex gap-2">
+							{authStore.connectedPlatforms.map(platform => (
+								<div key={platform} className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}>
+									{getPlatformIcon(platform)}
+									<span className="text-xs">{getPlatformName(platform)}</span>
+								</div>
+							))}
+						</div>
+						<button
+							type="button"
+							onClick={() => authStore.disconnectAll()}
+							className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+						>
+							Disconnect All
+						</button>
 					</div>
-					{/* Content */}
-					{authStore.spotify?.accessToken ? (
-						<>
-							<SpotifyPlaylistGrid accessToken={authStore.spotify?.accessToken} />
-							<SpotifySearch accessToken={authStore.spotify?.accessToken} />
-						</>
-					) : (
-						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
-							<p>
-								<strong>Note:</strong> To view your Spotify playlists, please sign in with Spotify.
-							</p>
-						</div>
-					)}
-
-					{authStore.google?.accessToken ? (
-						<>
-							<YouTubePlaylistGrid accessToken={authStore.google.accessToken} />
-							<YouTubeSearch accessToken={authStore.google.accessToken} />
-						</>
-					) : (
-						<div className='bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md'>
-							<p>
-								<strong>Note:</strong> To view your YouTube playlists, please sign in with Google.
-							</p>
-						</div>
-					)}
 				</div>
 			</div>
-		)
-	}
+		</nav>
+	)
 
-	return <LoginScreen />
+	return (
+		<Router>
+			<Routes>
+				<Route path="/login" element={!authStore.hasAnyConnection ? <Login /> : <Navigate to="/playlists" />} />
+				<Route path="/playlists" element={authStore.hasAnyConnection ? (
+					<div>
+						<Navigation />
+						<Playlists />
+					</div>
+				) : <Navigate to="/login" />} />
+				<Route path="/search" element={authStore.hasAnyConnection ? (
+					<div>
+						<Navigation />
+						<Search />
+					</div>
+				) : <Navigate to="/login" />} />
+				<Route path="/" element={<Navigate to={authStore.hasAnyConnection ? "/playlists" : "/login"} />} />
+			</Routes>
+		</Router>
+	)
 })
 
 export default App
