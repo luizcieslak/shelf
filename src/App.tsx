@@ -9,6 +9,8 @@ import type { Platform } from './types/platform'
 const App = observer(() => {
 	const { authStore } = useStores()
 
+	console.log('authstore?', authStore)
+
 	const getPlatformIcon = (platform: Platform) => {
 		switch (platform) {
 			case 'spotify':
@@ -81,9 +83,9 @@ const App = observer(() => {
 						<Link to="/playlists" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
 							Playlists
 						</Link>
-						<Link to="/search" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
+						{/* <Link to="/search" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
 							Search
-						</Link>
+						</Link> */}
 					</div>
 					<div className="flex items-center space-x-4">
 						<div className="flex gap-2">
