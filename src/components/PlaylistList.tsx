@@ -4,12 +4,15 @@ import {
 	DotsVerticalIcon,
 	ExclamationTriangleIcon,
 	UpdateIcon,
+	ExternalLinkIcon,
+	PlusIcon,
 } from '@radix-ui/react-icons'
 import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { SpotifyService } from '../services/spotify'
 import { YouTubeService } from '../services/youtube'
 import { useStores } from '../stores/StoreContext'
+import AddTracksDialog from './AddTracksDialog'
 import type { SpotifyPlaylist, SpotifyTrack } from '../types/spotify'
 
 interface PlaylistListProps {
@@ -22,6 +25,7 @@ interface TransferProgress {
 	message: string
 	tracksAdded?: number
 	totalTracks?: number
+	playlistUrl?: string
 }
 
 const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
@@ -33,6 +37,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const [error, setError] = useState<string | null>(null)
 	const [transferProgress, setTransferProgress] = useState<Record<string, TransferProgress[]>>({})
 	const [transferringPlaylist, setTransferringPlaylist] = useState<string | null>(null)
+	const [successfulTransfers, setSuccessfulTransfers] = useState<Set<string>>(new Set())
+	const [addTracksDialogOpen, setAddTracksDialogOpen] = useState(false)
+	const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
 
 	const fetchPlaylistTracks = async (playlistId: string): Promise<SpotifyTrack[]> => {
 		if (playlistTracks[playlistId]) return playlistTracks[playlistId]
@@ -58,6 +65,28 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		} else {
 			setExpandedPlaylist(playlistId)
 			await fetchPlaylistTracks(playlistId)
+		}
+	}
+
+	const handleAddTracks = (playlist: SpotifyPlaylist) => {
+		setSelectedPlaylist(playlist)
+		setAddTracksDialogOpen(true)
+	}
+
+	const handleTrackAdded = (track: SpotifyTrack) => {
+		if (selectedPlaylist) {
+			// Update the playlist tracks in the local state
+			setPlaylistTracks(prev => ({
+				...prev,
+				[selectedPlaylist.id]: [...(prev[selectedPlaylist.id] || []), track],
+			}))
+
+			// Update the playlist's track count
+			setPlaylists(prev => prev.map(p =>
+				p.id === selectedPlaylist.id
+					? { ...p, tracks: { ...p.tracks, total: p.tracks.total + 1 } }
+					: p
+			))
 		}
 	}
 
@@ -105,6 +134,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 			// Step 1: Create playlist
 			const createdPlaylist = await youtubeService.createPlaylist(playlist.name, playlist.description || '')
+			const playlistUrl = `https://www.youtube.com/playlist?list=${createdPlaylist.id}`
 
 			setTransferProgress(prev => ({
 				...prev,
@@ -181,9 +211,15 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 						message: `${successCount}/${totalTracks} of tracks added`,
 						tracksAdded: successCount,
 						totalTracks: totalTracks,
+						playlistUrl: playlistUrl,
 					},
 				],
 			}))
+
+			// Mark as successful transfer if at least some tracks were added
+			if (successCount > 0) {
+				setSuccessfulTransfers(prev => new Set([...prev, playlist.id]))
+			}
 		} catch (err) {
 			console.error('Transfer failed:', err)
 			setTransferProgress(prev => ({
@@ -253,8 +289,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 									>
 										{playlist.name}
 									</h3>
-									{/* Spotify Icon */}
-									<div className='flex-shrink-0'>
+									{/* Platform Icons */}
+									<div className='flex-shrink-0 flex items-center gap-1'>
+										{/* Spotify Icon */}
 										<svg
 											className='w-4 h-4 text-green-600'
 											viewBox='0 0 24 24'
@@ -262,8 +299,19 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 											aria-label='Spotify'
 										>
 											<title>Spotify</title>
-											<path d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.786-.963-.335.077-.67-.133-.746-.469-.077-.336.132-.67.469-.746 3.809-.871 7.077-.496 9.713 1.115.294.18.386.563.207.856zm1.223-2.723c-.226.367-.706.482-1.073.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.125-.849-.106-.973-.518-.125-.413.106-.849.518-.973 3.632-1.102 8.147-.568 11.238 1.327.366.226.481.706.255 1.073zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71c-.493.15-1.016-.128-1.166-.622-.149-.493.129-1.016.622-1.165 3.532-1.073 9.404-.865 13.115 1.338.445.264.590.837.326 1.282-.264.444-.838.590-1.282.326z' />
+											<path d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.786-.963-.335.077-.67-.133-.746-.469-.077-.336.132-.67.469-.746 3.809-.871 7.077-.496 9.713 1.115.294.18.386.563.207.856zm1.223-2.723c-.226.367-.706.482-1.073.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.125-.849-.106-.973-.518-.125-.413.106-.849.518-.973 3.632-1.102 8.147-.568 11.238 1.327.366.226.481.706.255 1.073zm.105-2.835C14.692 8.50 9.375 8.775 6.297 9.71c-.493.15-1.016-.128-1.166-.622-.149-.493.129-1.016.622-1.165 3.532-1.073 9.404-.865 13.115 1.338.445.264.590.837.326 1.282-.264.444-.838.590-1.282.326z' />
 										</svg>
+
+										{/* YouTube Icon - Show only if successfully transferred */}
+										{successfulTransfers.has(playlist.id) && (
+											<svg className='w-4 h-4' viewBox='0 0 24 24' aria-label='YouTube'>
+												<title>YouTube</title>
+												<path
+													fill='#FF0000'
+													d='M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'
+												/>
+											</svg>
+										)}
 									</div>
 								</div>
 								<p className='text-sm text-gray-600 mb-2'>{playlist.tracks.total} tracks</p>
@@ -282,6 +330,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 								</DropdownMenu.Trigger>
 								<DropdownMenu.Portal>
 									<DropdownMenu.Content className='bg-white rounded-md shadow-lg border border-gray-200 p-1 min-w-[160px]'>
+										<DropdownMenu.Item
+											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
+											onClick={() => handleAddTracks(playlist)}
+										>
+											<PlusIcon className='w-4 h-4' />
+											Add tracks
+										</DropdownMenu.Item>
 										<DropdownMenu.Item
 											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
 											onClick={() => transferToYouTube(playlist)}
@@ -312,6 +367,17 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 										>
 											{getStatusIcon(progress.status)}
 											<span className='text-gray-700'>{progress.message}</span>
+											{progress.playlistUrl && progress.step === 'completed' && (
+												<a
+													href={progress.playlistUrl}
+													target='_blank'
+													rel='noopener noreferrer'
+													className='flex items-center gap-1 text-blue-600 hover:text-blue-800 ml-2'
+												>
+													<span className='text-xs'>View playlist</span>
+													<ExternalLinkIcon className='w-3 h-3' />
+												</a>
+											)}
 										</div>
 									))}
 								</div>
@@ -365,6 +431,17 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					</div>
 				</div>
 			))}
+
+			{/* Add Tracks Dialog */}
+			{selectedPlaylist && (
+				<AddTracksDialog
+					open={addTracksDialogOpen}
+					onOpenChange={setAddTracksDialogOpen}
+					playlist={selectedPlaylist}
+					accessToken={accessToken}
+					onTrackAdded={handleTrackAdded}
+				/>
+			)}
 		</div>
 	)
 })

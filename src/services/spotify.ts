@@ -65,4 +65,21 @@ export class SpotifyService {
 
 		return response.json()
 	}
+
+	async addTrackToPlaylist(playlistId: string, trackUri: string): Promise<void> {
+		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${this.accessToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				uris: [trackUri],
+			}),
+		})
+
+		if (!response.ok) {
+			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+		}
+	}
 }

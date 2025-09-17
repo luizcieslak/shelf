@@ -52,6 +52,7 @@ export class AuthStore {
 				scopes: [
 					'playlist-read-private',
 					'playlist-modify-private',
+					'playlist-modify-public',
 					'playlist-read-collaborative',
 					'user-read-email',
 				],
