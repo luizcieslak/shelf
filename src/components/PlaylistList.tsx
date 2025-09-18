@@ -6,6 +6,7 @@ import {
 	UpdateIcon,
 	ExternalLinkIcon,
 	PlusIcon,
+	Link2Icon,
 } from '@radix-ui/react-icons'
 import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
@@ -29,7 +30,7 @@ interface TransferProgress {
 }
 
 const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
-	const { authStore } = useStores()
+	const { authStore, syncStore } = useStores()
 	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
 	const [playlistTracks, setPlaylistTracks] = useState<Record<string, SpotifyTrack[]>>({})
 	const [expandedPlaylist, setExpandedPlaylist] = useState<string | null>(null)
@@ -73,7 +74,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		setAddTracksDialogOpen(true)
 	}
 
-	const handleTrackAdded = (track: SpotifyTrack) => {
+	const handleTrackAdded = async (track: SpotifyTrack) => {
 		if (selectedPlaylist) {
 			// Update the playlist tracks in the local state
 			setPlaylistTracks(prev => ({
@@ -87,6 +88,38 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					? { ...p, tracks: { ...p.tracks, total: p.tracks.total + 1 } }
 					: p
 			))
+
+			// If playlist is synced, also add to YouTube
+			if (syncStore.isPlaylistLinked(selectedPlaylist.id)) {
+				const linkedPlaylist = syncStore.getLinkedPlaylist(selectedPlaylist.id)
+				if (linkedPlaylist && authStore.google?.accessToken) {
+					try {
+						const youtubeService = new YouTubeService(authStore.google.accessToken)
+						const searchQuery = `${track.name} ${track.artists.map(a => a.name).join(' ')}`
+						await youtubeService.addTrackToPlaylist(linkedPlaylist.youtubePlaylistId, searchQuery)
+						syncStore.updateLastSync(selectedPlaylist.id)
+					} catch (err) {
+						console.error('Failed to sync track to YouTube:', err)
+					}
+				}
+			}
+		}
+	}
+
+	const handleSyncPlaylist = (playlist: SpotifyPlaylist) => {
+		// Get the YouTube playlist info from the transfer progress
+		const progress = transferProgress[playlist.id]
+		if (progress) {
+			const completedStep = progress.find(p => p.step === 'completed' && p.playlistUrl)
+			if (completedStep?.playlistUrl) {
+				// Extract YouTube playlist ID from URL
+				const urlParams = new URLSearchParams(new URL(completedStep.playlistUrl).search)
+				const youtubePlaylistId = urlParams.get('list')
+
+				if (youtubePlaylistId) {
+					syncStore.linkPlaylists(playlist.id, youtubePlaylistId, completedStep.playlistUrl)
+				}
+			}
 		}
 	}
 
@@ -304,13 +337,19 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 										{/* YouTube Icon - Show only if successfully transferred */}
 										{successfulTransfers.has(playlist.id) && (
-											<svg className='w-4 h-4' viewBox='0 0 24 24' aria-label='YouTube'>
-												<title>YouTube</title>
-												<path
-													fill='#FF0000'
-													d='M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'
-												/>
-											</svg>
+											<div className="flex items-center gap-1">
+												<svg className='w-4 h-4' viewBox='0 0 24 24' aria-label='YouTube'>
+													<title>YouTube</title>
+													<path
+														fill='#FF0000'
+														d='M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'
+													/>
+												</svg>
+												{/* Sync Icon - Show only if synced */}
+												{syncStore.isPlaylistLinked(playlist.id) && (
+													<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' />
+												)}
+											</div>
 										)}
 									</div>
 								</div>
@@ -337,6 +376,18 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 											<PlusIcon className='w-4 h-4' />
 											Add tracks
 										</DropdownMenu.Item>
+
+										{/* Show Sync option only for successfully transferred playlists that aren't already synced */}
+										{successfulTransfers.has(playlist.id) && !syncStore.isPlaylistLinked(playlist.id) && (
+											<DropdownMenu.Item
+												className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
+												onClick={() => handleSyncPlaylist(playlist)}
+											>
+												<Link2Icon className='w-4 h-4' />
+												Sync
+											</DropdownMenu.Item>
+										)}
+
 										<DropdownMenu.Item
 											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
 											onClick={() => transferToYouTube(playlist)}
