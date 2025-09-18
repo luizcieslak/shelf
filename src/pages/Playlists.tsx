@@ -12,9 +12,7 @@ const Playlists = observer(() => {
 				{authStore.spotify?.accessToken ? (
 					<PlaylistList accessToken={authStore.spotify.accessToken} />
 				) : (
-					<div className='text-center py-8 bg-white rounded-lg shadow-md max-w-[600px] mx-auto'>
-						<LoginScreen />
-					</div>
+					<LoginScreen />
 				)}
 			</div>
 		</div>

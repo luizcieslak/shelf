@@ -139,9 +139,20 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const transferToYouTube = async (playlist: SpotifyPlaylist) => {
 		if (!authStore.google?.accessToken) {
 			try {
+				console.log('Authenticating with Google...')
 				await authStore.connectGoogle()
+
+				// Give a small delay to ensure the observable state has updated
+				await new Promise(resolve => setTimeout(resolve, 100))
+
 				// Check if authentication was successful
+				console.log('Google auth result:', {
+					hasGoogle: !!authStore.google,
+					hasAccessToken: !!authStore.google?.accessToken,
+					connectedPlatforms: authStore.connectedPlatforms
+				})
 				if (!authStore.google?.accessToken) {
+					console.log('User cancelled authentication')
 					return // User cancelled authentication
 				}
 			} catch (error) {
@@ -299,8 +310,6 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	if (error) {
 		return <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md'>{error}</div>
 	}
-
-	console.log('playlists', playlists)
 
 	return (
 		<div className='max-w-[600px] mx-auto space-y-4'>

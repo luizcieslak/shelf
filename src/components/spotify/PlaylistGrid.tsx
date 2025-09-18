@@ -16,7 +16,6 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 		try {
 			const spotifyService = new SpotifyService(accessToken)
 			const response = await spotifyService.getPlaylistTracks(playlistId)
-			console.log('tracks respoonse:', response)
 			setPlaylistTracks(prev => ({
 				...prev,
 				[playlistId]: response.items.map(item => item.track),
@@ -33,7 +32,6 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 				const spotifyService = new SpotifyService(accessToken)
 				const response = await spotifyService.getCurrentUserPlaylists()
 				setPlaylists(response.items)
-				console.log('playlists:', response.items)
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
 				setError('Failed to load playlists')

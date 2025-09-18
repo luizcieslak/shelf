@@ -9,7 +9,7 @@ import type { Platform } from './types/platform'
 const App = observer(() => {
 	const { authStore } = useStores()
 
-	console.log('authstore?', authStore)
+	console.log('App render - connected platforms:', authStore.connectedPlatforms)
 
 	const getPlatformIcon = (platform: Platform) => {
 		switch (platform) {

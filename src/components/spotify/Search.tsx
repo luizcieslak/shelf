@@ -37,8 +37,6 @@ const Search = ({ accessToken }: SearchProps) => {
 		return () => clearTimeout(debounceTimeout)
 	}, [query, accessToken])
 
-	console.log('search tracks', tracks)
-
 	return (
 		<div className='space-y-6'>
 			<div className='max-w-2xl'>
