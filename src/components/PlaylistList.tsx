@@ -139,24 +139,27 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const transferToYouTube = async (playlist: SpotifyPlaylist) => {
 		if (!authStore.google?.accessToken) {
 			try {
-				console.log('Authenticating with Google...')
+				console.log('Starting YouTube authentication...')
 				await authStore.connectGoogle()
 
 				// Give a small delay to ensure the observable state has updated
-				await new Promise(resolve => setTimeout(resolve, 100))
+				await new Promise(resolve => setTimeout(resolve, 500))
 
 				// Check if authentication was successful
-				console.log('Google auth result:', {
+				console.log('YouTube auth completed:', {
 					hasGoogle: !!authStore.google,
 					hasAccessToken: !!authStore.google?.accessToken,
 					connectedPlatforms: authStore.connectedPlatforms
 				})
+
 				if (!authStore.google?.accessToken) {
-					console.log('User cancelled authentication')
+					console.log('YouTube authentication failed or cancelled')
 					return // User cancelled authentication
 				}
+
+				console.log('YouTube authentication successful!')
 			} catch (error) {
-				console.error('Failed to authenticate with Google:', error)
+				console.error('Failed to authenticate with YouTube:', error)
 				return
 			}
 		}

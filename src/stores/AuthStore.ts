@@ -82,6 +82,8 @@ export class AuthStore {
 	}
 
 	async connectGoogle() {
+		console.log('AuthStore.connectGoogle() called')
+
 		// Set loading state
 		this.google = {
 			user: null!,
@@ -92,7 +94,10 @@ export class AuthStore {
 			playlistsLoading: false,
 		}
 
+		console.log('Google auth loading state set, connected platforms:', this.connectedPlatforms)
+
 		try {
+			console.log('Starting PocketBase OAuth2 for Google...')
 			const authData: AuthResponse = await this.pb.collection('users').authWithOAuth2({
 				provider: 'google',
 				scopes: [
@@ -102,6 +107,8 @@ export class AuthStore {
 					'https://www.googleapis.com/auth/userinfo.email',
 				],
 			})
+
+			console.log('PocketBase OAuth2 successful, authData:', authData)
 
 			// Update Google auth state
 			this.google = {
@@ -113,6 +120,11 @@ export class AuthStore {
 				playlists: [],
 				playlistsLoading: false,
 			}
+
+			console.log('Google auth state updated:', {
+				hasAccessToken: !!this.google.accessToken,
+				connectedPlatforms: this.connectedPlatforms
+			})
 		} catch (err) {
 			console.error('Google OAuth error:', err)
 			this.google = {
