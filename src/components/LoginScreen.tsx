@@ -8,8 +8,7 @@ const LoginScreen = observer(() => {
 		<div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'>
 			<div className='max-w-md w-full space-y-8 bg-white p-8 rounded-xl shadow-lg'>
 				<div className='text-center'>
-					<h2 className='text-3xl font-bold text-gray-900'>Welcome to Shelf</h2>
-					<p className='mt-2 text-gray-600'>Connect your music platforms to transfer playlists</p>
+					<h2 className='text-3xl font-bold text-gray-900'>Shelf</h2>
 				</div>
 
 				<div className='space-y-4'>
@@ -81,7 +80,7 @@ const LoginScreen = observer(() => {
 					</button>
 
 					<p className='text-center text-sm text-gray-500'>
-						Connect your platforms to start transferring playlists between services
+						Connect your platforms to start managing your musics.
 					</p>
 				</div>
 
@@ -111,10 +110,6 @@ const LoginScreen = observer(() => {
 						</button>
 					</div>
 				)}
-
-				<div className='text-center text-xs text-gray-500'>
-					By connecting, you agree to our Terms of Service and Privacy Policy.
-				</div>
 			</div>
 		</div>
 	)
