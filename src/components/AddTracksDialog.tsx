@@ -80,8 +80,8 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 	return (
 		<Dialog.Root open={open} onOpenChange={onOpenChange}>
 			<Dialog.Portal>
-				<Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-				<Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+				<Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" />
+				<Dialog.Content className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden animate-scale-in">
 					{/* Header */}
 					<div className="flex items-center justify-between p-6 border-b border-gray-200">
 						<div>
@@ -95,7 +95,7 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 						<Dialog.Close asChild>
 							<button
 								type="button"
-								className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+								className="p-2 hover:bg-gray-100 rounded-md transition-smooth hover-scale"
 								aria-label="Close"
 							>
 								<Cross1Icon className="w-4 h-4" />
@@ -114,7 +114,7 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 								placeholder="Search for tracks..."
 								value={query}
 								onChange={e => setQuery(e.target.value)}
-								className="w-full pl-10 pr-12 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+								className="w-full pl-10 pr-12 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition-smooth"
 							/>
 							<div className="absolute inset-y-0 right-0 pr-3 flex items-center">
 								{/* Spotify Logo */}
@@ -129,21 +129,24 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 					{/* Content */}
 					<div className="flex-1 overflow-y-auto p-6">
 						{loading && (
-							<div className='flex justify-center py-8'>
-								<div className='animate-spin h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full' />
+							<div className='flex justify-center py-8 animate-fade-in'>
+								<div className='spinner h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full' />
 							</div>
 						)}
 
 						{error && (
-							<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6'>{error}</div>
+							<div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 animate-slide-down'>{error}</div>
 						)}
 
 						{/* Search Results */}
 						<div className="space-y-3">
-							{tracks.map(track => (
+							{tracks.map((track, index) => (
 								<div
 									key={track.id}
-									className='flex items-center gap-3 p-3 hover:bg-gray-50 rounded-md transition-colors group'
+									className='flex items-center gap-3 p-3 hover:bg-gray-50 rounded-md transition-smooth hover-lift group stagger-item'
+									style={{
+										animationDelay: `${index * 50}ms`
+									}}
 								>
 									{track.album.images[0] && (
 										<img
@@ -168,10 +171,10 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 										type="button"
 										onClick={() => handleAddTrack(track)}
 										disabled={addingTracks.has(track.id)}
-										className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors opacity-0 group-hover:opacity-100"
+										className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-smooth hover-scale opacity-0 group-hover:opacity-100"
 									>
 										{addingTracks.has(track.id) ? (
-											<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+											<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full spinner" />
 										) : (
 											<PlusIcon className="w-4 h-4" />
 										)}
@@ -182,11 +185,11 @@ const AddTracksDialog = ({ open, onOpenChange, playlist, accessToken, onTrackAdd
 						</div>
 
 						{query && !loading && tracks.length === 0 && (
-							<div className='text-center text-gray-500 py-8'>No tracks found for "{query}"</div>
+							<div className='text-center text-gray-500 py-8 animate-fade-in'>No tracks found for "{query}"</div>
 						)}
 
 						{!query && (
-							<div className='text-center text-gray-500 py-8'>Start typing to search for tracks</div>
+							<div className='text-center text-gray-500 py-8 animate-fade-in'>Start typing to search for tracks</div>
 						)}
 					</div>
 				</Dialog.Content>
