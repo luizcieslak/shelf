@@ -479,7 +479,11 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 							}`}
 							data-state={expandedPlaylist === playlist.id ? 'open' : 'closed'}
 						>
-							<div className='space-y-3 max-h-80 overflow-y-auto'>
+							<div className={`space-y-3 ${
+								playlistTracks[playlist.id] && playlistTracks[playlist.id].length > 8
+									? 'max-h-80 overflow-y-auto'
+									: ''
+							}`}>
 								{playlistTracks[playlist.id]?.map((track, index) => (
 									<div
 										key={track.id}
