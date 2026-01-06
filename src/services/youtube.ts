@@ -1,8 +1,8 @@
 import type {
+	YouTubePlaylist,
 	YouTubePlaylistItemsResponse,
 	YouTubePlaylistsResponse,
 	YouTubeSearchResponse,
-	YouTubePlaylist,
 } from '../types/youtube'
 
 export class YouTubeService {
@@ -100,7 +100,10 @@ export class YouTubeService {
 		return result
 	}
 
-	async addTrackToPlaylist(playlistId: string, searchQuery: string): Promise<void> {
+	async addTrackToPlaylist(
+		playlistId: string,
+		searchQuery: string,
+	): Promise<{ playlistItemId: string; videoId: string }> {
 		// First, search for the track
 		const searchResult = await this.searchTracks(searchQuery, 1)
 
@@ -130,6 +133,62 @@ export class YouTubeService {
 
 		if (!response.ok) {
 			throw new Error(`Failed to add track to playlist: ${response.status} ${response.statusText}`)
+		}
+
+		const result = await response.json()
+		return {
+			playlistItemId: result.id,
+			videoId,
+		}
+	}
+
+	async reorderPlaylistTracks(
+		playlistId: string,
+		playlistItemId: string,
+		videoId: string,
+		_fromPosition: number,
+		toPosition: number,
+	): Promise<void> {
+		// YouTube doesn't have a native reorder API
+		// We need to: 1) Delete the item, 2) Re-insert at new position
+
+		// Step 1: Delete the item at the old position
+		const deleteResponse = await fetch(
+			`https://www.googleapis.com/youtube/v3/playlistItems?id=${playlistItemId}`,
+			{
+				method: 'DELETE',
+				headers: {
+					Authorization: `Bearer ${this.accessToken}`,
+					'Content-Type': 'application/json',
+				},
+			},
+		)
+
+		if (!deleteResponse.ok) {
+			throw new Error(`Failed to delete playlist item: ${deleteResponse.status} ${deleteResponse.statusText}`)
+		}
+
+		// Step 2: Re-insert at new position
+		const insertResponse = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${this.accessToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				snippet: {
+					playlistId,
+					position: toPosition,
+					resourceId: {
+						kind: 'youtube#video',
+						videoId,
+					},
+				},
+			}),
+		})
+
+		if (!insertResponse.ok) {
+			throw new Error(`Failed to insert playlist item: ${insertResponse.status} ${insertResponse.statusText}`)
 		}
 	}
 }

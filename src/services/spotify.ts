@@ -82,4 +82,28 @@ export class SpotifyService {
 			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
 		}
 	}
+
+	async reorderPlaylistTracks(
+		playlistId: string,
+		rangeStart: number,
+		insertBefore: number,
+		rangeLength = 1,
+	): Promise<void> {
+		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+			method: 'PUT',
+			headers: {
+				Authorization: `Bearer ${this.accessToken}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				range_start: rangeStart,
+				insert_before: insertBefore,
+				range_length: rangeLength,
+			}),
+		})
+
+		if (!response.ok) {
+			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+		}
+	}
 }

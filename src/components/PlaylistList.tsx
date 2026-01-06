@@ -1,20 +1,45 @@
+import {
+	DndContext,
+	DragOverlay,
+	type DragEndEvent,
+	type DragStartEvent,
+	KeyboardSensor,
+	PointerSensor,
+	useSensor,
+	useSensors,
+	MeasuringStrategy,
+	closestCenter,
+	type CollisionDetection,
+} from '@dnd-kit/core'
+import {
+	arrayMove,
+	SortableContext,
+	sortableKeyboardCoordinates,
+	useSortable,
+	verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { snapCenterToCursor } from '@dnd-kit/modifiers'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
 	CheckCircledIcon,
 	DotsVerticalIcon,
+	DownloadIcon,
+	DragHandleDots2Icon,
 	ExclamationTriangleIcon,
-	UpdateIcon,
 	ExternalLinkIcon,
-	PlusIcon,
 	Link2Icon,
+	PlusIcon,
+	UpdateIcon,
 } from '@radix-ui/react-icons'
 import { observer } from 'mobx-react-lite'
 import { useEffect, useState } from 'react'
 import { SpotifyService } from '../services/spotify'
 import { YouTubeService } from '../services/youtube'
 import { useStores } from '../stores/StoreContext'
-import AddTracksDialog from './AddTracksDialog'
 import type { SpotifyPlaylist, SpotifyTrack } from '../types/spotify'
+import { downloadPlaylistAsJson } from '../utils/exportPlaylist'
+import AddTracksDialog from './AddTracksDialog'
 
 interface PlaylistListProps {
 	accessToken: string
@@ -29,6 +54,100 @@ interface TransferProgress {
 	playlistUrl?: string
 }
 
+interface SortableTrackItemProps {
+	track: SpotifyTrack
+	isExpanded: boolean
+}
+
+const SortableTrackItem = ({ track, isExpanded }: SortableTrackItemProps) => {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
+		id: track.id,
+	})
+
+	const style = {
+		transform: CSS.Transform.toString(transform),
+		transition: transition,
+		// Prevent the dragged item from moving (only other items should shift)
+		...(isDragging && { transform: 'translate3d(0, 0, 0)' }),
+	}
+
+	return (
+		<div className='relative'>
+			{/* Drop indicator - shows when hovering over this item during drag */}
+			{isOver && (
+				<div className='absolute -top-1 left-1 right-1 h-0.5 bg-blue-500 z-10 animate-pulse'>
+					<div className='absolute left-0 -top-1 w-2 h-2 bg-blue-500 rounded-full' />
+					<div className='absolute right-0 -top-1 w-2 h-2 bg-blue-500 rounded-full' />
+				</div>
+			)}
+			<div
+				ref={setNodeRef}
+				style={style}
+				className={`flex items-center gap-3 p-2 rounded-md cursor-grab active:cursor-grabbing ${
+					isDragging
+						? 'bg-gray-100 border-2 border-dashed border-gray-300'
+						: 'hover:bg-gray-50 transition-smooth hover-lift'
+				} ${isExpanded && !isDragging ? 'stagger-item' : ''}`}
+				{...attributes}
+				{...listeners}
+			>
+				<div className={`flex items-center gap-3 flex-1 min-w-0 ${isDragging ? 'opacity-40' : ''}`}>
+					{track.album.images[0] && (
+						<img
+							src={track.album.images[0].url}
+							alt={track.album.name}
+							className='w-10 h-10 rounded object-cover flex-shrink-0'
+							style={{ borderRadius: '5px' }}
+						/>
+					)}
+					<div className='flex-1 min-w-0'>
+						<div className='font-semibold text-gray-900 truncate' style={{ fontSize: '14px', fontWeight: 600 }}>
+							{track.name}
+						</div>
+						<div className='text-gray-600 truncate' style={{ fontSize: '13px', fontWeight: 500 }}>
+							{track.artists.map(artist => artist.name).join(', ')}
+						</div>
+					</div>
+					<div className='p-2'>
+						<DragHandleDots2Icon className='w-4 h-4 text-gray-400' />
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
+
+// Component for the floating drag overlay
+interface TrackCardProps {
+	track: SpotifyTrack
+}
+
+const TrackCard = ({ track }: TrackCardProps) => {
+	return (
+		<div className='flex items-center gap-3 p-2 bg-white rounded-md shadow-lg border-2 border-blue-500 w-full max-w-md cursor-grabbing'>
+			{track.album.images[0] && (
+				<img
+					src={track.album.images[0].url}
+					alt={track.album.name}
+					className='w-10 h-10 rounded object-cover flex-shrink-0'
+					style={{ borderRadius: '5px' }}
+				/>
+			)}
+			<div className='flex-1 min-w-0'>
+				<div className='font-semibold text-gray-900 truncate' style={{ fontSize: '14px', fontWeight: 600 }}>
+					{track.name}
+				</div>
+				<div className='text-gray-600 truncate' style={{ fontSize: '13px', fontWeight: 500 }}>
+					{track.artists.map(artist => artist.name).join(', ')}
+				</div>
+			</div>
+			<div className='p-2'>
+				<DragHandleDots2Icon className='w-4 h-4 text-gray-400' />
+			</div>
+		</div>
+	)
+}
+
 const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const { authStore, syncStore } = useStores()
 	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
@@ -41,6 +160,63 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const [successfulTransfers, setSuccessfulTransfers] = useState<Set<string>>(new Set())
 	const [addTracksDialogOpen, setAddTracksDialogOpen] = useState(false)
 	const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
+	const [activeTrack, setActiveTrack] = useState<SpotifyTrack | null>(null)
+
+	const sensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: {
+				distance: 8, // Require 8px movement before drag starts
+			},
+		}),
+		useSensor(KeyboardSensor, {
+			coordinateGetter: sortableKeyboardCoordinates,
+		}),
+	)
+
+	const measuring = {
+		droppable: {
+			strategy: MeasuringStrategy.Always,
+		},
+	}
+
+	// Custom collision detection optimized for vertical lists
+	const customCollisionDetection: CollisionDetection = (args) => {
+		const { droppableContainers, pointerCoordinates } = args
+
+		if (!pointerCoordinates) {
+			return closestCenter(args)
+		}
+
+		const { y: pointerY } = pointerCoordinates
+
+		// Find which droppable the pointer is closest to based on Y position
+		const collisions = Array.from(droppableContainers.values())
+			.filter(container => container.disabled === false)
+			.map(container => {
+				const rect = container.rect.current
+
+				if (!rect) {
+					return { id: container.id, distance: Number.MAX_SAFE_INTEGER }
+				}
+
+				// Calculate distance from pointer Y to the center Y of this item
+				const centerY = rect.top + rect.height / 2
+				const distance = Math.abs(pointerY - centerY)
+
+				return {
+					id: container.id,
+					distance,
+				}
+			})
+			.sort((a, b) => a.distance - b.distance)
+
+		// Return the closest item based on Y distance
+		if (collisions.length > 0) {
+			return [{ id: collisions[0].id }]
+		}
+
+		return closestCenter(args)
+	}
 
 	const fetchPlaylistTracks = async (playlistId: string): Promise<SpotifyTrack[]> => {
 		if (playlistTracks[playlistId]) return playlistTracks[playlistId]
@@ -83,11 +259,11 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			}))
 
 			// Update the playlist's track count
-			setPlaylists(prev => prev.map(p =>
-				p.id === selectedPlaylist.id
-					? { ...p, tracks: { ...p.tracks, total: p.tracks.total + 1 } }
-					: p
-			))
+			setPlaylists(prev =>
+				prev.map(p =>
+					p.id === selectedPlaylist.id ? { ...p, tracks: { ...p.tracks, total: p.tracks.total + 1 } } : p,
+				),
+			)
 
 			// If playlist is synced, also add to YouTube
 			if (syncStore.isPlaylistLinked(selectedPlaylist.id)) {
@@ -96,7 +272,18 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					try {
 						const youtubeService = new YouTubeService(authStore.google.accessToken)
 						const searchQuery = `${track.name} ${track.artists.map(a => a.name).join(' ')}`
-						await youtubeService.addTrackToPlaylist(linkedPlaylist.youtubePlaylistId, searchQuery)
+						const youtubeTrack = await youtubeService.addTrackToPlaylist(
+							linkedPlaylist.youtubePlaylistId,
+							searchQuery,
+						)
+
+						// Store the mapping for future reordering
+						syncStore.addYouTubeTrackMapping(
+							selectedPlaylist.id,
+							track.id,
+							youtubeTrack.playlistItemId,
+							youtubeTrack.videoId,
+						)
 						syncStore.updateLastSync(selectedPlaylist.id)
 					} catch (err) {
 						console.error('Failed to sync track to YouTube:', err)
@@ -106,7 +293,92 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		}
 	}
 
-	const handleSyncPlaylist = (playlist: SpotifyPlaylist) => {
+	const handleDragStart = (event: DragStartEvent, playlistId: string) => {
+		const { active } = event
+		const tracks = playlistTracks[playlistId]
+		if (!tracks) return
+
+		const track = tracks.find(t => t.id === active.id)
+		if (track) {
+			setActiveTrack(track)
+		}
+	}
+
+	const handleDragCancel = () => {
+		setActiveTrack(null)
+	}
+
+	const handleDragEnd = async (event: DragEndEvent, playlistId: string) => {
+		const { active, over } = event
+
+		// Clear the active track
+		setActiveTrack(null)
+
+		if (!over || active.id === over.id) {
+			return
+		}
+
+		const tracks = playlistTracks[playlistId]
+		if (!tracks) return
+
+		const oldIndex = tracks.findIndex(track => track.id === active.id)
+		const newIndex = tracks.findIndex(track => track.id === over.id)
+
+		if (oldIndex === -1 || newIndex === -1) return
+
+		// Update local state optimistically
+		const newTracks = arrayMove(tracks, oldIndex, newIndex)
+		setPlaylistTracks(prev => ({
+			...prev,
+			[playlistId]: newTracks,
+		}))
+
+		try {
+			// Update Spotify
+			const spotifyService = new SpotifyService(accessToken)
+			await spotifyService.reorderPlaylistTracks(
+				playlistId,
+				oldIndex,
+				newIndex > oldIndex ? newIndex + 1 : newIndex,
+			)
+
+			// If synced, also update YouTube
+			if (syncStore.isPlaylistLinked(playlistId) && authStore.google?.accessToken) {
+				const linkedPlaylist = syncStore.getLinkedPlaylist(playlistId)
+				const track = newTracks[newIndex]
+
+				if (linkedPlaylist && track) {
+					try {
+						const mapping = syncStore.getYouTubeTrackMapping(playlistId, track.id)
+						if (mapping) {
+							const youtubeService = new YouTubeService(authStore.google.accessToken)
+							await youtubeService.reorderPlaylistTracks(
+								linkedPlaylist.youtubePlaylistId,
+								mapping.youtubePlaylistItemId,
+								mapping.youtubeVideoId,
+								oldIndex,
+								newIndex,
+							)
+							syncStore.updateLastSync(playlistId)
+						} else {
+							console.warn('No YouTube mapping found for track:', track.name)
+						}
+					} catch (err) {
+						console.error('Failed to reorder YouTube playlist:', err)
+					}
+				}
+			}
+		} catch (err) {
+			console.error('Failed to reorder tracks:', err)
+			// Revert optimistic update on error
+			setPlaylistTracks(prev => ({
+				...prev,
+				[playlistId]: tracks,
+			}))
+		}
+	}
+
+	const handleSyncPlaylist = async (playlist: SpotifyPlaylist) => {
 		// Get the YouTube playlist info from the transfer progress
 		const progress = transferProgress[playlist.id]
 		if (progress) {
@@ -118,10 +390,37 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 				if (youtubePlaylistId) {
 					syncStore.linkPlaylists(playlist.id, youtubePlaylistId, completedStep.playlistUrl)
+
+					// Fetch and cache YouTube playlist items for reordering
+					if (authStore.google?.accessToken) {
+						try {
+							const youtubeService = new YouTubeService(authStore.google.accessToken)
+							const youtubeItems = await youtubeService.getPlaylistItems(youtubePlaylistId)
+							const spotifyTracks = playlistTracks[playlist.id]
+
+							if (spotifyTracks && youtubeItems.items) {
+								// Match YouTube items with Spotify tracks by position
+								// This assumes tracks were added in the same order
+								youtubeItems.items.forEach((item, index) => {
+									if (spotifyTracks[index]) {
+										syncStore.addYouTubeTrackMapping(
+											playlist.id,
+											spotifyTracks[index].id,
+											item.id,
+											item.contentDetails.videoId,
+										)
+									}
+								})
+							}
+						} catch (err) {
+							console.error('Failed to fetch YouTube playlist items:', err)
+						}
+					}
 				}
 			}
 		}
 	}
+
 	const handleExportPlaylist = async (playlist: SpotifyPlaylist) => {
 		// Fetch tracks if not already loaded
 		const tracks = await fetchPlaylistTracks(playlist.id)
@@ -158,7 +457,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				console.log('YouTube auth completed:', {
 					hasGoogle: !!authStore.google,
 					hasAccessToken: !!authStore.google?.accessToken,
-					connectedPlatforms: authStore.connectedPlatforms
+					connectedPlatforms: authStore.connectedPlatforms,
 				})
 
 				if (!authStore.google?.accessToken) {
@@ -332,7 +631,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					key={playlist.id}
 					className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-smooth hover-lift stagger-item'
 					style={{
-						animationDelay: `${index * 100}ms`
+						animationDelay: `${index * 100}ms`,
 					}}
 				>
 					<div className='p-4'>
@@ -361,7 +660,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 										{/* YouTube Icon - Show only if successfully transferred */}
 										{successfulTransfers.has(playlist.id) && (
-											<div className="flex items-center gap-1">
+											<div className='flex items-center gap-1'>
 												<svg className='w-4 h-4' viewBox='0 0 24 24' aria-label='YouTube'>
 													<title>YouTube</title>
 													<path
@@ -448,10 +747,12 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 											key={`${playlist.id}-${progress.step}-${index}`}
 											className='flex items-center gap-2 text-sm stagger-item'
 											style={{
-												animationDelay: `${index * 100}ms`
+												animationDelay: `${index * 100}ms`,
 											}}
 										>
-											<div className={`transition-smooth ${progress.status === 'loading' ? 'animate-pulse' : ''}`}>
+											<div
+												className={`transition-smooth ${progress.status === 'loading' ? 'animate-pulse' : ''}`}
+											>
 												{getStatusIcon(progress.status)}
 											</div>
 											<span className='text-gray-700'>{progress.message}</span>
@@ -481,11 +782,11 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 							<span>{expandedPlaylist === playlist.id ? 'Hide tracks' : 'Show tracks'}</span>
 							<svg
 								className={`w-4 h-4 transition-smooth ${expandedPlaylist === playlist.id ? 'rotate-180' : 'rotate-0'}`}
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke="currentColor"
+								fill='none'
+								viewBox='0 0 24 24'
+								stroke='currentColor'
 							>
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+								<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
 							</svg>
 						</button>
 
@@ -496,43 +797,38 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 							}`}
 							data-state={expandedPlaylist === playlist.id ? 'open' : 'closed'}
 						>
-							<div className={`space-y-3 ${
-								playlistTracks[playlist.id] && playlistTracks[playlist.id].length > 8
-									? 'max-h-80 overflow-y-auto'
-									: ''
-							}`}>
-								{playlistTracks[playlist.id]?.map((track, index) => (
+							<DndContext
+								sensors={sensors}
+								collisionDetection={customCollisionDetection}
+								onDragStart={event => handleDragStart(event, playlist.id)}
+								onDragEnd={event => handleDragEnd(event, playlist.id)}
+								onDragCancel={handleDragCancel}
+								measuring={measuring}
+							>
+								<SortableContext
+									items={playlistTracks[playlist.id]?.map(track => track.id) || []}
+									strategy={verticalListSortingStrategy}
+								>
 									<div
-										key={track.id}
-										className={`flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-smooth hover-lift ${
-											expandedPlaylist === playlist.id ? 'stagger-item' : ''
+										className={`space-y-3 overflow-x-hidden ${
+											playlistTracks[playlist.id] && playlistTracks[playlist.id].length > 8
+												? 'max-h-80 overflow-y-auto'
+												: ''
 										}`}
-										style={{
-											animationDelay: expandedPlaylist === playlist.id ? `${index * 30}ms` : undefined
-										}}
 									>
-										{track.album.images[0] && (
-											<img
-												src={track.album.images[0].url}
-												alt={track.album.name}
-												className='w-10 h-10 rounded object-cover flex-shrink-0'
-												style={{ borderRadius: '5px' }}
+										{playlistTracks[playlist.id]?.map(track => (
+											<SortableTrackItem
+												key={track.id}
+												track={track}
+												isExpanded={expandedPlaylist === playlist.id}
 											/>
-										)}
-										<div className='flex-1 min-w-0'>
-											<div
-												className='font-semibold text-gray-900 truncate'
-												style={{ fontSize: '14px', fontWeight: 600 }}
-											>
-												{track.name}
-											</div>
-											<div className='text-gray-600 truncate' style={{ fontSize: '13px', fontWeight: 500 }}>
-												{track.artists.map(artist => artist.name).join(', ')}
-											</div>
-										</div>
+										))}
 									</div>
-								))}
-							</div>
+								</SortableContext>
+								<DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
+									{activeTrack ? <TrackCard track={activeTrack} /> : null}
+								</DragOverlay>
+							</DndContext>
 						</div>
 					</div>
 				</div>
