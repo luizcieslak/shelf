@@ -123,7 +123,7 @@ export class AuthStore {
 
 			console.log('Google auth state updated:', {
 				hasAccessToken: !!this.google.accessToken,
-				connectedPlatforms: this.connectedPlatforms
+				connectedPlatforms: this.connectedPlatforms,
 			})
 		} catch (err) {
 			console.error('Google OAuth error:', err)

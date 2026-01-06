@@ -1,9 +1,9 @@
 import { observer } from 'mobx-react-lite'
-import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom'
-import { useStores } from './stores/StoreContext'
+import { Link, Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Login from './pages/Login'
 import Playlists from './pages/Playlists'
 import Search from './pages/Search'
+import { useStores } from './stores/StoreContext'
 import type { Platform } from './types/platform'
 
 const App = observer(() => {
@@ -63,31 +63,37 @@ const App = observer(() => {
 	}
 
 	const Navigation = () => (
-		<nav className="bg-white shadow-sm border-b">
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-				<div className="flex justify-between h-16">
-					<div className="flex items-center space-x-8">
-						<h1 className="text-xl font-bold text-gray-900">Shelf</h1>
-						<Link to="/playlists" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
+		<nav className='bg-white shadow-sm border-b'>
+			<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+				<div className='flex justify-between h-16'>
+					<div className='flex items-center space-x-8'>
+						<h1 className='text-xl font-bold text-gray-900'>Shelf</h1>
+						<Link
+							to='/playlists'
+							className='inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600'
+						>
 							Playlists
 						</Link>
 						{/* <Link to="/search" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
 							Search
 						</Link> */}
 					</div>
-					<div className="flex items-center space-x-4">
-						<div className="flex gap-2">
+					<div className='flex items-center space-x-4'>
+						<div className='flex gap-2'>
 							{authStore.connectedPlatforms.map(platform => (
-								<div key={platform} className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}>
+								<div
+									key={platform}
+									className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}
+								>
 									{getPlatformIcon(platform)}
-									<span className="text-xs">{getPlatformName(platform)}</span>
+									<span className='text-xs'>{getPlatformName(platform)}</span>
 								</div>
 							))}
 						</div>
 						<button
-							type="button"
+							type='button'
 							onClick={() => authStore.disconnectAll()}
-							className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+							className='inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700'
 						>
 							Disconnect All
 						</button>
@@ -100,20 +106,37 @@ const App = observer(() => {
 	return (
 		<Router>
 			<Routes>
-				<Route path="/login" element={!authStore.hasAnyConnection ? <Login /> : <Navigate to="/playlists" />} />
-				<Route path="/playlists" element={authStore.hasAnyConnection ? (
-					<div>
-						<Navigation />
-						<Playlists />
-					</div>
-				) : <Navigate to="/login" />} />
-				<Route path="/search" element={authStore.hasAnyConnection ? (
-					<div>
-						<Navigation />
-						<Search />
-					</div>
-				) : <Navigate to="/login" />} />
-				<Route path="/" element={<Navigate to={authStore.hasAnyConnection ? "/playlists" : "/login"} />} />
+				<Route
+					path='/login'
+					element={!authStore.hasAnyConnection ? <Login /> : <Navigate to='/playlists' />}
+				/>
+				<Route
+					path='/playlists'
+					element={
+						authStore.hasAnyConnection ? (
+							<div>
+								<Navigation />
+								<Playlists />
+							</div>
+						) : (
+							<Navigate to='/login' />
+						)
+					}
+				/>
+				<Route
+					path='/search'
+					element={
+						authStore.hasAnyConnection ? (
+							<div>
+								<Navigation />
+								<Search />
+							</div>
+						) : (
+							<Navigate to='/login' />
+						)
+					}
+				/>
+				<Route path='/' element={<Navigate to={authStore.hasAnyConnection ? '/playlists' : '/login'} />} />
 			</Routes>
 		</Router>
 	)

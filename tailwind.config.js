@@ -11,9 +11,9 @@ export default {
 			},
 			// Animation durations following 0.2s to 0.3s guideline
 			transitionDuration: {
-				'200': '200ms',
-				'250': '250ms',
-				'300': '300ms',
+				200: '200ms',
+				250: '250ms',
+				300: '300ms',
 			},
 			// Custom keyframe animations
 			keyframes: {
@@ -41,11 +41,11 @@ export default {
 					'0%': { transform: 'scale(1)', opacity: '1' },
 					'100%': { transform: 'scale(0.95)', opacity: '0' },
 				},
-				'expand': {
+				expand: {
 					'0%': { transform: 'scaleY(0)', opacity: '0' },
 					'100%': { transform: 'scaleY(1)', opacity: '1' },
 				},
-				'collapse': {
+				collapse: {
 					'0%': { transform: 'scaleY(1)', opacity: '1' },
 					'100%': { transform: 'scaleY(0)', opacity: '0' },
 				},
@@ -57,8 +57,8 @@ export default {
 				'slide-up': 'slide-up 0.25s ease-out-smooth forwards',
 				'scale-in': 'scale-in 0.2s ease-out-quick forwards',
 				'scale-out': 'scale-out 0.2s ease-out-quick forwards',
-				'expand': 'expand 0.3s ease-out-smooth forwards',
-				'collapse': 'collapse 0.3s ease-out-smooth forwards',
+				expand: 'expand 0.3s ease-out-smooth forwards',
+				collapse: 'collapse 0.3s ease-out-smooth forwards',
 			},
 		},
 	},
