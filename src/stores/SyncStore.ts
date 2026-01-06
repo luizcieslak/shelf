@@ -1,11 +1,18 @@
 import { makeAutoObservable } from 'mobx'
 
+export interface YouTubeTrackMapping {
+	spotifyTrackId: string
+	youtubePlaylistItemId: string
+	youtubeVideoId: string
+}
+
 export interface PlaylistLink {
 	spotifyPlaylistId: string
 	youtubePlaylistId: string
 	youtubePlaylistUrl: string
 	createdAt: Date
 	lastSyncAt: Date
+	youtubeTrackMappings?: YouTubeTrackMapping[]
 }
 
 export class SyncStore {
@@ -38,6 +45,30 @@ export class SyncStore {
 		if (link) {
 			link.lastSyncAt = new Date()
 		}
+	}
+
+	addYouTubeTrackMapping(
+		spotifyPlaylistId: string,
+		spotifyTrackId: string,
+		youtubePlaylistItemId: string,
+		youtubeVideoId: string,
+	) {
+		const link = this.linkedPlaylists.get(spotifyPlaylistId)
+		if (link) {
+			if (!link.youtubeTrackMappings) {
+				link.youtubeTrackMappings = []
+			}
+			link.youtubeTrackMappings.push({
+				spotifyTrackId,
+				youtubePlaylistItemId,
+				youtubeVideoId,
+			})
+		}
+	}
+
+	getYouTubeTrackMapping(spotifyPlaylistId: string, spotifyTrackId: string): YouTubeTrackMapping | undefined {
+		const link = this.linkedPlaylists.get(spotifyPlaylistId)
+		return link?.youtubeTrackMappings?.find(mapping => mapping.spotifyTrackId === spotifyTrackId)
 	}
 
 	// Computed values

@@ -122,6 +122,15 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			}
 		}
 	}
+	const handleExportPlaylist = async (playlist: SpotifyPlaylist) => {
+		// Fetch tracks if not already loaded
+		const tracks = await fetchPlaylistTracks(playlist.id)
+		if (tracks.length === 0) {
+			console.error('No tracks to export')
+			return
+		}
+		downloadPlaylistAsJson(playlist, tracks)
+	}
 
 	const getStatusIcon = (status: 'loading' | 'success' | 'error' | 'warning') => {
 		switch (status) {
@@ -390,6 +399,14 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 										>
 											<PlusIcon className='w-4 h-4' />
 											Add tracks
+										</DropdownMenu.Item>
+
+										<DropdownMenu.Item
+											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
+											onClick={() => handleExportPlaylist(playlist)}
+										>
+											<DownloadIcon className='w-4 h-4' />
+											Export as JSON
 										</DropdownMenu.Item>
 
 										{/* Show Sync option only for successfully transferred playlists that aren't already synced */}
