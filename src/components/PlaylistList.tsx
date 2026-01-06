@@ -57,9 +57,11 @@ interface TransferProgress {
 interface SortableTrackItemProps {
 	track: SpotifyTrack
 	isExpanded: boolean
+	index: number
+	activeIndex: number | null
 }
 
-const SortableTrackItem = ({ track, isExpanded }: SortableTrackItemProps) => {
+const SortableTrackItem = ({ track, isExpanded, index, activeIndex }: SortableTrackItemProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
 		id: track.id,
 	})
@@ -71,11 +73,21 @@ const SortableTrackItem = ({ track, isExpanded }: SortableTrackItemProps) => {
 		...(isDragging && { transform: 'translate3d(0, 0, 0)' }),
 	}
 
+	// Determine if indicator should be above or below
+	// When dragging UP (activeIndex > index), the item will be placed ABOVE the hovered item
+	// When dragging DOWN (activeIndex < index), the item will be placed BELOW the hovered item
+	// Exception: when dragging down, we show above the item below the target
+	const showIndicatorAbove = activeIndex !== null && activeIndex > index
+
 	return (
 		<div className='relative'>
 			{/* Drop indicator - shows when hovering over this item during drag */}
-			{isOver && (
-				<div className='absolute -top-1 left-1 right-1 h-0.5 bg-blue-500 z-10 animate-pulse'>
+			{isOver && !isDragging && (
+				<div
+					className={`absolute left-1 right-1 h-0.5 bg-blue-500 z-10 animate-pulse ${
+						showIndicatorAbove ? '-top-1' : '-bottom-1'
+					}`}
+				>
 					<div className='absolute left-0 -top-1 w-2 h-2 bg-blue-500 rounded-full' />
 					<div className='absolute right-0 -top-1 w-2 h-2 bg-blue-500 rounded-full' />
 				</div>
@@ -161,6 +173,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const [addTracksDialogOpen, setAddTracksDialogOpen] = useState(false)
 	const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
 	const [activeTrack, setActiveTrack] = useState<SpotifyTrack | null>(null)
+	const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
@@ -298,14 +311,18 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		const tracks = playlistTracks[playlistId]
 		if (!tracks) return
 
-		const track = tracks.find(t => t.id === active.id)
-		if (track) {
+		const trackIndex = tracks.findIndex(t => t.id === active.id)
+		const track = tracks[trackIndex]
+
+		if (track && trackIndex !== -1) {
 			setActiveTrack(track)
+			setActiveIndex(trackIndex)
 		}
 	}
 
 	const handleDragCancel = () => {
 		setActiveTrack(null)
+		setActiveIndex(null)
 	}
 
 	const handleDragEnd = async (event: DragEndEvent, playlistId: string) => {
@@ -313,6 +330,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 		// Clear the active track
 		setActiveTrack(null)
+		setActiveIndex(null)
 
 		if (!over || active.id === over.id) {
 			return
@@ -816,11 +834,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 												: ''
 										}`}
 									>
-										{playlistTracks[playlist.id]?.map(track => (
+										{playlistTracks[playlist.id]?.map((track, index) => (
 											<SortableTrackItem
 												key={track.id}
 												track={track}
 												isExpanded={expandedPlaylist === playlist.id}
+												index={index}
+												activeIndex={activeIndex}
 											/>
 										))}
 									</div>
