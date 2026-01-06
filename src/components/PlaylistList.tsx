@@ -828,7 +828,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 									strategy={verticalListSortingStrategy}
 								>
 									<div
-										className={`space-y-3 overflow-x-hidden ${
+										className={`space-y-3 overflow-x-hidden pt-2 ${
 											playlistTracks[playlist.id] && playlistTracks[playlist.id].length > 8
 												? 'max-h-80 overflow-y-auto'
 												: ''
