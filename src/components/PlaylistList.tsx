@@ -304,8 +304,8 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 	if (loading) {
 		return (
-			<div className='flex justify-center items-center py-8'>
-				<div className='animate-spin h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full' />
+			<div className='flex justify-center items-center py-8 animate-fade-in'>
+				<div className='spinner h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full' />
 			</div>
 		)
 	}
@@ -318,10 +318,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		<div className='max-w-[600px] mx-auto space-y-4'>
 			<h2 className='text-2xl font-bold text-gray-900 mb-6'>Your Playlists</h2>
 
-			{playlists.map(playlist => (
+			{playlists.map((playlist, index) => (
 				<div
 					key={playlist.id}
-					className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'
+					className='bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-smooth hover-lift stagger-item'
+					style={{
+						animationDelay: `${index * 100}ms`
+					}}
 				>
 					<div className='p-4'>
 						{/* Playlist Header */}
@@ -373,16 +376,16 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 								<DropdownMenu.Trigger asChild>
 									<button
 										type='button'
-										className='p-2 hover:bg-gray-100 rounded-md transition-colors'
+										className='p-2 hover:bg-gray-100 rounded-md transition-smooth hover-scale'
 										disabled={transferringPlaylist === playlist.id}
 									>
 										<DotsVerticalIcon className='w-4 h-4 text-gray-600' />
 									</button>
 								</DropdownMenu.Trigger>
 								<DropdownMenu.Portal>
-									<DropdownMenu.Content className='bg-white rounded-md shadow-lg border border-gray-200 p-1 min-w-[160px]'>
+									<DropdownMenu.Content className='bg-white rounded-md shadow-lg border border-gray-200 p-1 min-w-[160px] animate-scale-in'>
 										<DropdownMenu.Item
-											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
+											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
 											onClick={() => handleAddTracks(playlist)}
 										>
 											<PlusIcon className='w-4 h-4' />
@@ -392,7 +395,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 										{/* Show Sync option only for successfully transferred playlists that aren't already synced */}
 										{successfulTransfers.has(playlist.id) && !syncStore.isPlaylistLinked(playlist.id) && (
 											<DropdownMenu.Item
-												className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
+												className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
 												onClick={() => handleSyncPlaylist(playlist)}
 											>
 												<Link2Icon className='w-4 h-4' />
@@ -401,7 +404,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 										)}
 
 										<DropdownMenu.Item
-											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2'
+											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
 											onClick={() => transferToYouTube(playlist)}
 											disabled={transferringPlaylist === playlist.id}
 										>
@@ -421,21 +424,26 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 						{/* Transfer Progress */}
 						{transferProgress[playlist.id] && (
-							<div className='mb-4 p-3 bg-gray-50 rounded-md'>
+							<div className='mb-4 p-3 bg-gray-50 rounded-md animate-slide-down'>
 								<div className='space-y-2'>
 									{transferProgress[playlist.id].map((progress, index) => (
 										<div
 											key={`${playlist.id}-${progress.step}-${index}`}
-											className='flex items-center gap-2 text-sm'
+											className='flex items-center gap-2 text-sm stagger-item'
+											style={{
+												animationDelay: `${index * 100}ms`
+											}}
 										>
-											{getStatusIcon(progress.status)}
+											<div className={`transition-smooth ${progress.status === 'loading' ? 'animate-pulse' : ''}`}>
+												{getStatusIcon(progress.status)}
+											</div>
 											<span className='text-gray-700'>{progress.message}</span>
 											{progress.playlistUrl && progress.step === 'completed' && (
 												<a
 													href={progress.playlistUrl}
 													target='_blank'
 													rel='noopener noreferrer'
-													className='flex items-center gap-1 text-blue-600 hover:text-blue-800 ml-2'
+													className='flex items-center gap-1 text-blue-600 hover:text-blue-800 ml-2 transition-smooth hover-scale'
 												>
 													<span className='text-xs'>View playlist</span>
 													<ExternalLinkIcon className='w-3 h-3' />
@@ -451,22 +459,40 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 						<button
 							type='button'
 							onClick={() => handleExpandToggle(playlist.id)}
-							className='text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors'
+							className='text-sm text-blue-600 hover:text-blue-800 font-medium transition-smooth hover-scale flex items-center gap-1'
 						>
-							{expandedPlaylist === playlist.id ? 'Hide tracks' : 'Show tracks'}
+							<span>{expandedPlaylist === playlist.id ? 'Hide tracks' : 'Show tracks'}</span>
+							<svg
+								className={`w-4 h-4 transition-smooth ${expandedPlaylist === playlist.id ? 'rotate-180' : 'rotate-0'}`}
+								fill="none"
+								viewBox="0 0 24 24"
+								stroke="currentColor"
+							>
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+							</svg>
 						</button>
 
 						{/* Expandable Tracks */}
 						<div
-							className={`overflow-hidden transition-all duration-300 ease-in-out ${
-								expandedPlaylist === playlist.id ? 'max-h-96 opacity-100 mt-4' : 'max-h-0 opacity-0'
+							className={`collapsible-content ${
+								expandedPlaylist === playlist.id ? 'max-h-96 mt-4' : 'max-h-0'
 							}`}
+							data-state={expandedPlaylist === playlist.id ? 'open' : 'closed'}
 						>
-							<div className='space-y-3 max-h-80 overflow-y-auto'>
-								{playlistTracks[playlist.id]?.map(track => (
+							<div className={`space-y-3 ${
+								playlistTracks[playlist.id] && playlistTracks[playlist.id].length > 8
+									? 'max-h-80 overflow-y-auto'
+									: ''
+							}`}>
+								{playlistTracks[playlist.id]?.map((track, index) => (
 									<div
 										key={track.id}
-										className='flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-colors'
+										className={`flex items-center gap-3 p-2 hover:bg-gray-50 rounded-md transition-smooth hover-lift ${
+											expandedPlaylist === playlist.id ? 'stagger-item' : ''
+										}`}
+										style={{
+											animationDelay: expandedPlaylist === playlist.id ? `${index * 30}ms` : undefined
+										}}
 									>
 										{track.album.images[0] && (
 											<img
