@@ -239,7 +239,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 		try {
 			const spotifyService = new SpotifyService(accessToken)
-			const response = await spotifyService.getPlaylistTracks(playlistId)
+			const response = await spotifyService.getAllPlaylistTracks(playlistId)
 			const tracks = response.items.map(item => item.track)
 			setPlaylistTracks(prev => ({
 				...prev,
