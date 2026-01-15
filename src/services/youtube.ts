@@ -56,6 +56,30 @@ export class YouTubeService {
 		return response.json()
 	}
 
+	async getAllPlaylistItems(playlistId: string): Promise<YouTubePlaylistItemsResponse> {
+		const maxResults = 50 // Max allowed by YouTube API
+		let allItems: YouTubePlaylistItemsResponse['items'] = []
+		let pageToken: string | undefined
+
+		// Fetch all pages
+		do {
+			const page = await this.getPlaylistItems(playlistId, maxResults, pageToken)
+			allItems = [...allItems, ...page.items]
+			pageToken = page.nextPageToken
+		} while (pageToken)
+
+		// Return with structure matching single page response
+		return {
+			kind: 'youtube#playlistItemListResponse',
+			etag: '',
+			pageInfo: {
+				totalResults: allItems.length,
+				resultsPerPage: maxResults,
+			},
+			items: allItems,
+		}
+	}
+
 	async searchTracks(query: string, maxResults = 20, pageToken?: string): Promise<YouTubeSearchResponse> {
 		const response = await fetch(
 			`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&q=${encodeURIComponent(

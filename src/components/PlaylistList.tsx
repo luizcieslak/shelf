@@ -416,7 +416,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					if (authStore.google?.accessToken) {
 						try {
 							const youtubeService = new YouTubeService(authStore.google.accessToken)
-							const youtubeItems = await youtubeService.getPlaylistItems(youtubePlaylistId)
+							const youtubeItems = await youtubeService.getAllPlaylistItems(youtubePlaylistId)
 							const spotifyTracks = playlistTracks[playlist.id]
 
 							if (spotifyTracks && youtubeItems.items) {
