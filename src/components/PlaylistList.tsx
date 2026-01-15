@@ -1,16 +1,17 @@
 import {
+	type CollisionDetection,
+	closestCenter,
 	DndContext,
-	DragOverlay,
 	type DragEndEvent,
+	DragOverlay,
 	type DragStartEvent,
 	KeyboardSensor,
+	MeasuringStrategy,
 	PointerSensor,
 	useSensor,
 	useSensors,
-	MeasuringStrategy,
-	closestCenter,
-	type CollisionDetection,
 } from '@dnd-kit/core'
+import { snapCenterToCursor } from '@dnd-kit/modifiers'
 import {
 	arrayMove,
 	SortableContext,
@@ -19,7 +20,6 @@ import {
 	verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { snapCenterToCursor } from '@dnd-kit/modifiers'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import {
 	CheckCircledIcon,
@@ -113,7 +113,10 @@ const SortableTrackItem = ({ track, isExpanded, index, activeIndex }: SortableTr
 						/>
 					)}
 					<div className='flex-1 min-w-0'>
-						<div className='font-semibold text-gray-900 truncate' style={{ fontSize: '14px', fontWeight: 600 }}>
+						<div
+							className='font-semibold text-gray-900 truncate'
+							style={{ fontSize: '14px', fontWeight: 600 }}
+						>
 							{track.name}
 						</div>
 						<div className='text-gray-600 truncate' style={{ fontSize: '13px', fontWeight: 500 }}>
@@ -193,7 +196,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	}
 
 	// Custom collision detection optimized for vertical lists
-	const customCollisionDetection: CollisionDetection = (args) => {
+	const customCollisionDetection: CollisionDetection = args => {
 		const { droppableContainers, pointerCoordinates } = args
 
 		if (!pointerCoordinates) {
