@@ -559,6 +559,25 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					const searchQuery = `${track.name} ${track.artists.map(a => a.name).join(' ')}`
 					await youtubeService.addTrackToPlaylist(createdPlaylist.id, searchQuery)
 					successCount++
+
+					// Update progress after each track
+					setTransferProgress(prev => ({
+						...prev,
+						[playlist.id]: [
+							{
+								step: 'creating',
+								status: 'success',
+								message: 'Creating a new playlist...',
+							},
+							{
+								step: 'adding',
+								status: 'loading',
+								message: `Adding tracks: ${successCount}/${totalTracks}`,
+								tracksAdded: successCount,
+								totalTracks: totalTracks,
+							},
+						],
+					}))
 				} catch (err) {
 					console.error(`Failed to add track: ${track.name}`, err)
 				}
@@ -579,12 +598,12 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					{
 						step: 'adding',
 						status: 'success',
-						message: 'Adding the tracks to the created playlist...',
+						message: `Added tracks: ${successCount}/${totalTracks}`,
 					},
 					{
 						step: 'completed',
 						status: finalStatus,
-						message: `${successCount}/${totalTracks} of tracks added`,
+						message: `Transfer complete: ${successCount}/${totalTracks} tracks`,
 						tracksAdded: successCount,
 						totalTracks: totalTracks,
 						playlistUrl: playlistUrl,

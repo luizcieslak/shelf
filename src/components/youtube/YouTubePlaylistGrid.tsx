@@ -137,7 +137,8 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 			const totalTracks = items.length
 			const trackUris: string[] = []
 
-			for (const item of items) {
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i]
 				try {
 					const searchQuery = item.snippet.title
 					const searchResult = await spotifyService.searchTracks(searchQuery, 1)
@@ -146,6 +147,25 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 						trackUris.push(searchResult.tracks.items[0].uri)
 						successCount++
 					}
+
+					// Update progress after each track search
+					setTransferProgress(prev => ({
+						...prev,
+						[playlist.id]: [
+							{
+								step: 'creating',
+								status: 'success',
+								message: 'Creating a new playlist...',
+							},
+							{
+								step: 'adding',
+								status: 'loading',
+								message: `Searching tracks: ${i + 1}/${totalTracks} (${successCount} found)`,
+								tracksAdded: successCount,
+								totalTracks: totalTracks,
+							},
+						],
+					}))
 				} catch (err) {
 					console.error(`Failed to find track: ${item.snippet.title}`, err)
 				}
@@ -153,6 +173,24 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 
 			// Step 4: Add all found tracks to Spotify playlist
 			if (trackUris.length > 0) {
+				setTransferProgress(prev => ({
+					...prev,
+					[playlist.id]: [
+						{
+							step: 'creating',
+							status: 'success',
+							message: 'Creating a new playlist...',
+						},
+						{
+							step: 'adding',
+							status: 'loading',
+							message: `Adding ${trackUris.length} tracks to Spotify...`,
+							tracksAdded: successCount,
+							totalTracks: totalTracks,
+						},
+					],
+				}))
+
 				await spotifyService.addTracksToPlaylist(createdPlaylist.id, trackUris)
 			}
 
@@ -171,12 +209,12 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 					{
 						step: 'adding',
 						status: 'success',
-						message: 'Adding the tracks to the created playlist...',
+						message: `Added tracks: ${successCount}/${totalTracks}`,
 					},
 					{
 						step: 'completed',
 						status: finalStatus,
-						message: `${successCount}/${totalTracks} of tracks added`,
+						message: `Transfer complete: ${successCount}/${totalTracks} tracks`,
 						tracksAdded: successCount,
 						totalTracks: totalTracks,
 						playlistUrl: playlistUrl,
