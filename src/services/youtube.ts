@@ -100,8 +100,8 @@ export class YouTubeService {
 		return response.json()
 	}
 
-	async createPlaylist(title: string, description?: string): Promise<YouTubePlaylist> {
-		const response = await fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet', {
+	async createPlaylist(title: string, description?: string, isPublic = true): Promise<YouTubePlaylist> {
+		const response = await fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet,status', {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${this.accessToken}`,
@@ -112,6 +112,9 @@ export class YouTubeService {
 					title,
 					description: description || '',
 					defaultLanguage: 'en',
+				},
+				status: {
+					privacyStatus: isPublic ? 'public' : 'private',
 				},
 			}),
 		})
