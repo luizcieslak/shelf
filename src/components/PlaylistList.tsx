@@ -164,7 +164,7 @@ const TrackCard = ({ track }: TrackCardProps) => {
 }
 
 const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
-	const { authStore, syncStore } = useStores()
+	const { authStore, syncStore, playlistStore } = useStores()
 	const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
 	const [playlistTracks, setPlaylistTracks] = useState<Record<string, SpotifyTrack[]>>({})
 	const [expandedPlaylist, setExpandedPlaylist] = useState<string | null>(null)
@@ -410,7 +410,20 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				const youtubePlaylistId = urlParams.get('list')
 
 				if (youtubePlaylistId) {
+					// Link in memory (for reordering support)
 					syncStore.linkPlaylists(playlist.id, youtubePlaylistId, completedStep.playlistUrl)
+
+					// Link in database
+					try {
+						const spotifyRecord = await playlistStore.findByPlatformId('spotify', playlist.id)
+						const youtubeRecord = await playlistStore.findByPlatformId('google', youtubePlaylistId)
+
+						if (spotifyRecord && youtubeRecord) {
+							await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
+						}
+					} catch (err) {
+						console.error('Failed to link playlists in database:', err)
+					}
 
 					// Fetch and cache YouTube playlist items for reordering
 					if (authStore.google?.accessToken) {
@@ -511,6 +524,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			// Step 1: Create playlist
 			const createdPlaylist = await youtubeService.createPlaylist(playlist.name, playlist.description || '')
 			const playlistUrl = `https://www.youtube.com/playlist?list=${createdPlaylist.id}`
+
+			// Save YouTube playlist to database
+			try {
+				await playlistStore.saveYouTubePlaylist(createdPlaylist)
+			} catch (err) {
+				console.error('Failed to save YouTube playlist to database:', err)
+			}
 
 			setTransferProgress(prev => ({
 				...prev,
@@ -639,6 +659,15 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				const spotifyService = new SpotifyService(accessToken)
 				const response = await spotifyService.getCurrentUserPlaylists()
 				setPlaylists(response.items)
+
+				// Save each playlist to database
+				for (const playlist of response.items) {
+					try {
+						await playlistStore.saveSpotifyPlaylist(playlist)
+					} catch (err) {
+						console.error('Failed to save playlist to database:', err)
+					}
+				}
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
 				setError('Failed to load playlists')
@@ -648,7 +677,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		}
 
 		fetchPlaylists()
-	}, [accessToken])
+	}, [accessToken, playlistStore])
 
 	if (loading) {
 		return (

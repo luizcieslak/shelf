@@ -1,6 +1,7 @@
 import PocketBase from 'pocketbase'
 import { createContext, type ReactNode, useContext } from 'react'
 import { AuthStore } from './AuthStore'
+import { PlaylistStore } from './PlaylistStore'
 import { SyncStore } from './SyncStore'
 
 // Create PocketBase instance
@@ -9,11 +10,13 @@ const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'http://127.0.0
 // Create store instances
 const authStore = new AuthStore(pb)
 const syncStore = new SyncStore()
+const playlistStore = new PlaylistStore(pb)
 
 // Create context
 const StoreContext = createContext({
 	authStore,
 	syncStore,
+	playlistStore,
 	pb,
 })
 
@@ -23,7 +26,11 @@ interface StoreProviderProps {
 }
 
 export const StoreProvider = ({ children }: StoreProviderProps) => {
-	return <StoreContext.Provider value={{ authStore, syncStore, pb }}>{children}</StoreContext.Provider>
+	return (
+		<StoreContext.Provider value={{ authStore, syncStore, playlistStore, pb }}>
+			{children}
+		</StoreContext.Provider>
+	)
 }
 
 // Hook to use stores
