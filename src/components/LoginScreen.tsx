@@ -1,8 +1,21 @@
 import { observer } from 'mobx-react-lite'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStores } from '../stores/StoreContext'
 
 const LoginScreen = observer(() => {
 	const { authStore } = useStores()
+	const navigate = useNavigate()
+
+	// Set up navigation callback on mount
+	useEffect(() => {
+		authStore.onAuthSuccess = () => {
+			navigate('/playlists')
+		}
+		return () => {
+			authStore.onAuthSuccess = undefined
+		}
+	}, [authStore, navigate])
 
 	return (
 		<div className='min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4'>

@@ -1,4 +1,4 @@
-import { makeAutoObservable } from 'mobx'
+import { makeAutoObservable, reaction } from 'mobx'
 import type PocketBase from 'pocketbase'
 import type { AuthResponse } from '../types/auth'
 import type { Platform, PlatformAuth } from '../types/platform'
@@ -12,9 +12,104 @@ export class AuthStore {
 	// PocketBase instance
 	private pb: PocketBase
 
+	// Navigation callback (set by LoginScreen)
+	onAuthSuccess?: () => void
+
 	constructor(pb: PocketBase) {
 		makeAutoObservable(this)
 		this.pb = pb
+		this.initialize()
+		this.setupPersistence()
+	}
+
+	// Initialize auth state from localStorage
+	async initialize() {
+		// Check if PocketBase has a valid auth session
+		if (!this.pb.authStore.isValid || !this.pb.authStore.record) {
+			return
+		}
+
+		try {
+			// Restore Spotify auth from localStorage
+			const spotifyAuth = localStorage.getItem('shelf_spotify_auth')
+			if (spotifyAuth) {
+				const parsed = JSON.parse(spotifyAuth)
+				this.spotify = {
+					user: this.pb.authStore.record,
+					accessToken: parsed.accessToken,
+					refreshToken: parsed.refreshToken,
+					isLoading: false,
+					error: null,
+					playlists: [],
+					playlistsLoading: false,
+				}
+			}
+
+			// Restore Google auth from localStorage
+			const googleAuth = localStorage.getItem('shelf_google_auth')
+			if (googleAuth) {
+				const parsed = JSON.parse(googleAuth)
+				this.google = {
+					user: this.pb.authStore.record,
+					accessToken: parsed.accessToken,
+					refreshToken: parsed.refreshToken,
+					isLoading: false,
+					error: null,
+					playlists: [],
+					playlistsLoading: false,
+				}
+			}
+
+			console.log('Auth restored from localStorage:', {
+				hasSpotify: !!this.spotify,
+				hasGoogle: !!this.google,
+				connectedPlatforms: this.connectedPlatforms,
+			})
+		} catch (err) {
+			console.error('Failed to restore auth state:', err)
+			// Clear corrupted data
+			localStorage.removeItem('shelf_spotify_auth')
+			localStorage.removeItem('shelf_google_auth')
+		}
+	}
+
+	// Setup automatic localStorage sync using MobX reactions
+	private setupPersistence() {
+		// Sync Spotify auth to localStorage
+		reaction(
+			() => this.spotify,
+			spotify => {
+				if (spotify?.accessToken) {
+					localStorage.setItem(
+						'shelf_spotify_auth',
+						JSON.stringify({
+							accessToken: spotify.accessToken,
+							refreshToken: spotify.refreshToken,
+						}),
+					)
+				} else {
+					localStorage.removeItem('shelf_spotify_auth')
+				}
+			},
+		)
+
+		// Sync Google auth to localStorage
+		reaction(
+			() => this.google,
+			google => {
+				if (google?.accessToken) {
+					localStorage.setItem(
+						'shelf_google_auth',
+						JSON.stringify({
+							accessToken: google.accessToken,
+							refreshToken: google.refreshToken,
+						}),
+					)
+				} else {
+					localStorage.removeItem('shelf_google_auth')
+				}
+			},
+		)
 	}
 
 	// Computed values
@@ -58,7 +153,7 @@ export class AuthStore {
 				],
 			})
 
-			// Update Spotify auth state
+			// Update Spotify auth state (MobX reaction will auto-persist to localStorage)
 			this.spotify = {
 				user: authData.record,
 				accessToken: authData.meta?.accessToken || '',
@@ -67,6 +162,11 @@ export class AuthStore {
 				error: null,
 				playlists: [],
 				playlistsLoading: false,
+			}
+
+			// Trigger navigation on successful auth
+			if (this.onAuthSuccess) {
+				this.onAuthSuccess()
 			}
 		} catch (err) {
 			console.error('Spotify OAuth error:', err)
@@ -110,7 +210,7 @@ export class AuthStore {
 
 			console.log('PocketBase OAuth2 successful, authData:', authData)
 
-			// Update Google auth state
+			// Update Google auth state (MobX reaction will auto-persist to localStorage)
 			this.google = {
 				user: authData.record,
 				accessToken: authData.meta?.accessToken || '',
@@ -125,6 +225,11 @@ export class AuthStore {
 				hasAccessToken: !!this.google.accessToken,
 				connectedPlatforms: this.connectedPlatforms,
 			})
+
+			// Trigger navigation on successful auth
+			if (this.onAuthSuccess) {
+				this.onAuthSuccess()
+			}
 		} catch (err) {
 			console.error('Google OAuth error:', err)
 			this.google = {
@@ -144,6 +249,7 @@ export class AuthStore {
 	}
 
 	disconnectPlatform(platform: Platform) {
+		// Set to null - MobX reaction will auto-clear from localStorage
 		switch (platform) {
 			case 'spotify':
 				this.spotify = null
@@ -158,10 +264,11 @@ export class AuthStore {
 	}
 
 	disconnectAll() {
+		// Set to null - MobX reactions will auto-clear from localStorage
 		this.spotify = null
 		this.apple = null
 		this.google = null
-		// Clear PocketBase session if no platforms connected
+		// Clear PocketBase session
 		this.pb.authStore.clear()
 	}
 
