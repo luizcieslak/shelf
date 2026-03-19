@@ -7,7 +7,7 @@ export interface SpotifyPlaylist {
 		height: number | null
 		width: number | null
 	}>
-	tracks: {
+	items?: {
 		total: number
 		href: string
 	}
@@ -41,7 +41,7 @@ export interface SpotifyPlaylistTracksResponse {
 
 export interface PlaylistTrackItem {
 	added_at: string
-	track: SpotifyTrack
+	item: SpotifyTrack
 }
 
 export interface SpotifyTrack {

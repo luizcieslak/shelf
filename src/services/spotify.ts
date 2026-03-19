@@ -33,7 +33,7 @@ export class SpotifyService {
 		offset = 0,
 	): Promise<SpotifyPlaylistTracksResponse> {
 		const response = await fetch(
-			`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`,
+			`https://api.spotify.com/v1/playlists/${playlistId}/items?limit=${limit}&offset=${offset}`,
 			{
 				headers: {
 					Authorization: `Bearer ${this.accessToken}`,
@@ -96,7 +96,7 @@ export class SpotifyService {
 	}
 
 	async addTrackToPlaylist(playlistId: string, trackUri: string): Promise<void> {
-		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items`, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${this.accessToken}`,
@@ -118,7 +118,7 @@ export class SpotifyService {
 		insertBefore: number,
 		rangeLength = 1,
 	): Promise<void> {
-		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+		const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items`, {
 			method: 'PUT',
 			headers: {
 				Authorization: `Bearer ${this.accessToken}`,
@@ -179,7 +179,7 @@ export class SpotifyService {
 		for (let i = 0; i < trackUris.length; i += batchSize) {
 			const batch = trackUris.slice(i, i + batchSize)
 
-			const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks`, {
+			const response = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/items`, {
 				method: 'POST',
 				headers: {
 					Authorization: `Bearer ${this.accessToken}`,

@@ -18,7 +18,7 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 			const response = await spotifyService.getPlaylistTracks(playlistId)
 			setPlaylistTracks(prev => ({
 				...prev,
-				[playlistId]: response.items.map(item => item.track),
+				[playlistId]: response.items.map(item => item.item),
 			}))
 		} catch (err) {
 			console.error('Error fetching playlist tracks:', err)
@@ -73,7 +73,7 @@ const PlaylistGrid = ({ accessToken }: PlaylistGridProps) => {
 								<p className='text-gray-600 text-sm mb-2 line-clamp-2'>{playlist.description}</p>
 							)}
 							<div className='flex justify-between items-center text-sm text-gray-500'>
-								<span>{playlist.tracks.total} tracks</span>
+								<span>{playlist.items?.total ?? 0} tracks</span>
 								<span>By {playlist.owner.display_name}</span>
 							</div>
 							<div className='mt-3 flex gap-2'>

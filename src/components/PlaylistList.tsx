@@ -240,7 +240,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		try {
 			const spotifyService = new SpotifyService(accessToken)
 			const response = await spotifyService.getAllPlaylistTracks(playlistId)
-			const tracks = response.items.map(item => item.track)
+			const tracks = response.items.map(item => item.item)
 			setPlaylistTracks(prev => ({
 				...prev,
 				[playlistId]: tracks,
@@ -277,7 +277,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			// Update the playlist's track count
 			setPlaylists(prev =>
 				prev.map(p =>
-					p.id === selectedPlaylist.id ? { ...p, tracks: { ...p.tracks, total: p.tracks.total + 1 } } : p,
+					p.id === selectedPlaylist.id && p.items
+						? { ...p, items: { ...p.items, total: p.items.total + 1 } }
+						: p,
 				),
 			)
 
@@ -745,7 +747,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 										)}
 									</div>
 								</div>
-								<p className='text-sm text-gray-600 mb-2'>{playlist.tracks.total} tracks</p>
+								<p className='text-sm text-gray-600 mb-2'>{playlist.items?.total ?? 0} tracks</p>
 							</div>
 
 							{/* Transfer Action */}
