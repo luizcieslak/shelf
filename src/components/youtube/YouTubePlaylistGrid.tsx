@@ -3,6 +3,7 @@ import {
 	CheckCircledIcon,
 	DotsVerticalIcon,
 	ExclamationTriangleIcon,
+	Link2Icon,
 	UpdateIcon,
 } from '@radix-ui/react-icons'
 import { observer } from 'mobx-react-lite'
@@ -26,14 +27,31 @@ interface TransferProgress {
 }
 
 const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps) => {
-	const { authStore } = useStores()
+	const { authStore, playlistStore } = useStores()
 	const [playlists, setPlaylists] = useState<YouTubePlaylist[]>([])
 	const [playlistItems, setPlaylistItems] = useState<Record<string, YouTubePlaylistItem[]>>({})
+	const [expandedPlaylists, setExpandedPlaylists] = useState<Set<string>>(new Set())
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [transferProgress, setTransferProgress] = useState<Record<string, TransferProgress[]>>({})
 	const [transferringPlaylist, setTransferringPlaylist] = useState<string | null>(null)
 	const [successfulTransfers, setSuccessfulTransfers] = useState<Set<string>>(new Set())
+
+	const togglePlaylistExpanded = async (playlistId: string) => {
+		setExpandedPlaylists(prev => {
+			const newSet = new Set(prev)
+			if (newSet.has(playlistId)) {
+				newSet.delete(playlistId)
+			} else {
+				newSet.add(playlistId)
+				// Fetch tracks if not already loaded
+				if (!playlistItems[playlistId]) {
+					fetchPlaylistItems(playlistId)
+				}
+			}
+			return newSet
+		})
+	}
 
 	const fetchPlaylistItems = async (playlistId: string) => {
 		if (playlistItems[playlistId]) return playlistItems[playlistId]
@@ -242,6 +260,14 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 		}
 	}
 
+	// Helper to check if a playlist is synced (from database)
+	const isPlaylistSyncedInDB = (youtubePlaylistId: string): boolean => {
+		const dbRecord = playlistStore.playlists.find(
+			p => p.platform === 'google' && p.platform_id === youtubePlaylistId,
+		)
+		return dbRecord ? (dbRecord.synced_with?.length || 0) > 0 : false
+	}
+
 	useEffect(() => {
 		const fetchPlaylists = async () => {
 			try {
@@ -249,6 +275,9 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 				const youtubeService = new YouTubeService(accessToken)
 				const response = await youtubeService.getCurrentUserPlaylists()
 				setPlaylists(response.items)
+
+				// Fetch synced playlists from database
+				await playlistStore.fetchPlaylists('google')
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
 				setError('Failed to load playlists')
@@ -258,7 +287,7 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 		}
 
 		fetchPlaylists()
-	}, [accessToken])
+	}, [accessToken, playlistStore])
 
 	if (loading) {
 		return (
@@ -305,8 +334,13 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 											/>
 										</svg>
 
-										{/* Spotify Icon - Show only if successfully transferred */}
-										{successfulTransfers.has(playlist.id) && (
+										{/* Sync Link Icon - Show if synced in DB */}
+										{isPlaylistSyncedInDB(playlist.id) && (
+											<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' title='Synced' />
+										)}
+
+										{/* Spotify Icon - Show if successfully transferred OR synced in DB */}
+										{(successfulTransfers.has(playlist.id) || isPlaylistSyncedInDB(playlist.id)) && (
 											<svg
 												className='w-4 h-4 text-green-600'
 												viewBox='0 0 24 24'
@@ -314,7 +348,7 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 												aria-label='Spotify'
 											>
 												<title>Spotify</title>
-												<path d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.786-.963-.335.077-.67-.133-.746-.469-.077-.336.132-.67.469-.746 3.809-.871 7.077-.496 9.713 1.115.294.18.386.563.207.856zm1.223-2.723c-.226.367-.706.482-1.073.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.125-.849-.106-.973-.518-.125-.413.106-.849.518-.973 3.632-1.102 8.147-.568 11.238 1.327.366.226.481.706.255 1.073zm.105-2.835C14.692 8.50 9.375 8.775 6.297 9.71c-.493.15-1.016-.128-1.166-.622-.149-.493.129-1.016.622-1.165 3.532-1.073 9.404-.865 13.115 1.338.445.264.590.837.326 1.282-.264.444-.838.590-1.282.326z' />
+												<path d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.786-.963-.335.077-.67-.133-.746-.469-.077-.336.132-.67.469-.746 3.809-.871 7.077-.496 9.713 1.115.294.18.386.563.207.856zm1.223-2.723c-.226.367-.706.482-1.073.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.125-.849-.106-.973-.518-.125-.413.106-.849.518-.973 3.632-1.102 8.147-.568 11.238 1.327.366.226.481.706.255 1.073zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71c-.493.15-1.016-.128-1.166-.622-.149-.493.129-1.016.622-1.165 3.532-1.073 9.404-.865 13.115 1.338.445.264.590.837.326 1.282-.264.444-.838.590-1.282.326z' />
 											</svg>
 										)}
 									</div>
@@ -385,31 +419,55 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 							</div>
 						)}
 
-						{/* Show tracks count or expandable details */}
-						<details
-							className='mt-2'
-							onToggle={e => {
-								if (e.currentTarget.open && !playlistItems[playlist.id]) {
-									fetchPlaylistItems(playlist.id)
-								}
-							}}
+						{/* Show/Hide tracks button */}
+						<button
+							type='button'
+							onClick={() => togglePlaylistExpanded(playlist.id)}
+							className='text-sm text-blue-600 hover:text-blue-800 font-medium transition-smooth hover-scale flex items-center gap-1'
 						>
-							<summary className='text-sm text-blue-600 hover:text-blue-800 font-medium transition-smooth hover-scale flex items-center gap-1 cursor-pointer'>
-								<span>Show tracks</span>
-							</summary>
-							<div className='mt-3 space-y-2 max-h-80 overflow-y-auto'>
+							<span>{expandedPlaylists.has(playlist.id) ? 'Hide tracks' : 'Show tracks'}</span>
+							<svg
+								className={`w-4 h-4 transition-transform ${expandedPlaylists.has(playlist.id) ? 'rotate-180' : ''}`}
+								fill='none'
+								viewBox='0 0 24 24'
+								stroke='currentColor'
+							>
+								<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M19 9l-7 7-7-7' />
+							</svg>
+						</button>
+
+						{/* Track List */}
+						{expandedPlaylists.has(playlist.id) && (
+							<div className='mt-3 space-y-2 max-h-80 overflow-y-auto overflow-x-hidden'>
 								{playlistItems[playlist.id]?.map((item, index) => (
-									<div key={item.id} className='flex items-center gap-3 p-2 rounded-md hover:bg-gray-50'>
-										<div className='text-sm text-gray-500' style={{ minWidth: '20px' }}>
-											{index + 1}
-										</div>
+									<div
+										key={item.id}
+										className='flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 transition-smooth hover-lift stagger-item'
+										style={{ animationDelay: `${index * 50}ms` }}
+									>
+										{item.snippet.thumbnails?.default && (
+											<img
+												src={item.snippet.thumbnails.default.url}
+												alt={item.snippet.title}
+												className='w-10 h-10 rounded object-cover flex-shrink-0'
+												style={{ borderRadius: '5px' }}
+											/>
+										)}
 										<div className='flex-1 min-w-0'>
-											<div className='text-sm text-gray-900 truncate'>{item.snippet.title}</div>
+											<div
+												className='font-semibold text-gray-900 truncate'
+												style={{ fontSize: '14px', fontWeight: 600 }}
+											>
+												{item.snippet.title}
+											</div>
+											<div className='text-gray-600 truncate' style={{ fontSize: '13px', fontWeight: 500 }}>
+												{item.snippet.videoOwnerChannelTitle || 'Unknown artist'}
+											</div>
 										</div>
 									</div>
 								))}
 							</div>
-						</details>
+						)}
 					</div>
 				</div>
 			))}
