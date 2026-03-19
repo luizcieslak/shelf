@@ -49,47 +49,85 @@ export class PlaylistStore {
 	}
 
 	/**
-	 * Save or update a Spotify playlist
+	 * Batch save Spotify playlists (optimized - single DB query)
 	 */
-	async saveSpotifyPlaylist(spotifyPlaylist: SpotifyPlaylist): Promise<PlaylistRecord> {
+	async saveSpotifyPlaylists(spotifyPlaylists: SpotifyPlaylist[]): Promise<void> {
 		try {
-			// Check if playlist already exists
-			const existing = await this.findByPlatformId('spotify', spotifyPlaylist.id)
+			// Fetch existing playlists for this user in one query
+			const platformIds = spotifyPlaylists.map(p => p.id)
+			const filter = `user="${this.pb.authStore.model?.id}" && platform="spotify" && (${platformIds.map(id => `platform_id="${id}"`).join(' || ')})`
 
-			const data: Partial<PlaylistRecord> = {
-				user: this.pb.authStore.model?.id,
-				platform: 'spotify',
-				platform_id: spotifyPlaylist.id,
-				name: spotifyPlaylist.name,
-				description: spotifyPlaylist.description || '',
-				image_url: spotifyPlaylist.images[0]?.url || '',
-				track_count: spotifyPlaylist.tracks.total,
-				external_url: spotifyPlaylist.external_urls.spotify,
-			}
-
-			let record: PlaylistRecord
-			if (existing) {
-				record = await this.pb.collection('playlists').update<PlaylistRecord>(existing.id, data)
-			} else {
-				record = await this.pb.collection('playlists').create<PlaylistRecord>(data)
-			}
-
-			runInAction(() => {
-				const index = this.playlists.findIndex(p => p.id === record.id)
-				if (index >= 0) {
-					this.playlists[index] = record
-				} else {
-					this.playlists.push(record)
-				}
+			const existing = await this.pb.collection('playlists').getFullList<PlaylistRecord>({
+				filter,
 			})
 
-			return record
+			const existingMap = new Map(existing.map(p => [p.platform_id, p]))
+
+			// Create or update each playlist
+			const savedRecords: PlaylistRecord[] = []
+
+			for (const playlist of spotifyPlaylists) {
+				const data: Partial<PlaylistRecord> = {
+					user: this.pb.authStore.model?.id,
+					platform: 'spotify',
+					platform_id: playlist.id,
+					name: playlist.name,
+					description: playlist.description || '',
+					image_url: playlist.images[0]?.url || '',
+					track_count: playlist.items?.total ?? 0,
+					external_url: playlist.external_urls.spotify,
+				}
+
+				const existingRecord = existingMap.get(playlist.id)
+
+				try {
+					if (existingRecord) {
+						// Only update if data changed
+						const needsUpdate =
+							existingRecord.name !== data.name ||
+							existingRecord.track_count !== data.track_count ||
+							existingRecord.description !== data.description
+
+						if (needsUpdate) {
+							const record = await this.pb.collection('playlists').update<PlaylistRecord>(existingRecord.id, data)
+							savedRecords.push(record)
+						} else {
+							savedRecords.push(existingRecord)
+						}
+					} else {
+						const record = await this.pb.collection('playlists').create<PlaylistRecord>(data)
+						savedRecords.push(record)
+					}
+				} catch (err) {
+					console.error(`Failed to save playlist ${playlist.name}:`, err)
+				}
+			}
+
+			runInAction(() => {
+				// Update local cache
+				for (const record of savedRecords) {
+					const index = this.playlists.findIndex(p => p.id === record.id)
+					if (index >= 0) {
+						this.playlists[index] = record
+					} else {
+						this.playlists.push(record)
+					}
+				}
+			})
 		} catch (err) {
 			runInAction(() => {
-				this.error = err instanceof Error ? err.message : 'Failed to save playlist'
+				this.error = err instanceof Error ? err.message : 'Failed to save playlists'
 			})
 			throw err
 		}
+	}
+
+	/**
+	 * Save or update a single Spotify playlist
+	 */
+	async saveSpotifyPlaylist(spotifyPlaylist: SpotifyPlaylist): Promise<PlaylistRecord> {
+		await this.saveSpotifyPlaylists([spotifyPlaylist])
+		return this.playlists.find(p => p.platform_id === spotifyPlaylist.id)!
 	}
 
 	/**

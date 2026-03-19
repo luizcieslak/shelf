@@ -178,6 +178,14 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 	const [activeTrack, setActiveTrack] = useState<SpotifyTrack | null>(null)
 	const [activeIndex, setActiveIndex] = useState<number | null>(null)
 
+	// Helper to check if a playlist is synced (from database)
+	const isPlaylistSyncedInDB = (spotifyPlaylistId: string): boolean => {
+		const dbRecord = playlistStore.playlists.find(
+			p => p.platform === 'spotify' && p.platform_id === spotifyPlaylistId
+		)
+		return dbRecord ? (dbRecord.synced_with?.length || 0) > 0 : false
+	}
+
 	const sensors = useSensors(
 		useSensor(PointerSensor, {
 			activationConstraint: {
@@ -401,61 +409,6 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		}
 	}
 
-	const handleSyncPlaylist = async (playlist: SpotifyPlaylist) => {
-		// Get the YouTube playlist info from the transfer progress
-		const progress = transferProgress[playlist.id]
-		if (progress) {
-			const completedStep = progress.find(p => p.step === 'completed' && p.playlistUrl)
-			if (completedStep?.playlistUrl) {
-				// Extract YouTube playlist ID from URL
-				const urlParams = new URLSearchParams(new URL(completedStep.playlistUrl).search)
-				const youtubePlaylistId = urlParams.get('list')
-
-				if (youtubePlaylistId) {
-					// Link in memory (for reordering support)
-					syncStore.linkPlaylists(playlist.id, youtubePlaylistId, completedStep.playlistUrl)
-
-					// Link in database
-					try {
-						const spotifyRecord = await playlistStore.findByPlatformId('spotify', playlist.id)
-						const youtubeRecord = await playlistStore.findByPlatformId('google', youtubePlaylistId)
-
-						if (spotifyRecord && youtubeRecord) {
-							await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
-						}
-					} catch (err) {
-						console.error('Failed to link playlists in database:', err)
-					}
-
-					// Fetch and cache YouTube playlist items for reordering
-					if (authStore.google?.accessToken) {
-						try {
-							const youtubeService = new YouTubeService(authStore.google.accessToken)
-							const youtubeItems = await youtubeService.getAllPlaylistItems(youtubePlaylistId)
-							const spotifyTracks = playlistTracks[playlist.id]
-
-							if (spotifyTracks && youtubeItems.items) {
-								// Match YouTube items with Spotify tracks by position
-								// This assumes tracks were added in the same order
-								youtubeItems.items.forEach((item, index) => {
-									if (spotifyTracks[index]) {
-										syncStore.addYouTubeTrackMapping(
-											playlist.id,
-											spotifyTracks[index].id,
-											item.id,
-											item.contentDetails.videoId,
-										)
-									}
-								})
-							}
-						} catch (err) {
-							console.error('Failed to fetch YouTube playlist items:', err)
-						}
-					}
-				}
-			}
-		}
-	}
 
 	const handleExportPlaylist = async (playlist: SpotifyPlaylist) => {
 		// Fetch tracks if not already loaded
@@ -636,6 +589,23 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			// Mark as successful transfer if at least some tracks were added
 			if (successCount > 0) {
 				setSuccessfulTransfers(prev => new Set([...prev, playlist.id]))
+
+				// Automatically save sync to database
+				try {
+					const spotifyRecord = await playlistStore.saveSpotifyPlaylist(playlist)
+					const youtubeRecord = await playlistStore.saveYouTubePlaylist(createdPlaylist)
+					await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
+
+					// Link in memory for reordering
+					syncStore.linkPlaylists(playlist.id, createdPlaylist.id, playlistUrl)
+
+					console.log('✅ Sync saved to database:', {
+						spotify: spotifyRecord.name,
+						youtube: youtubeRecord.name,
+					})
+				} catch (err) {
+					console.error('Failed to save sync to database:', err)
+				}
 			}
 		} catch (err) {
 			console.error('Transfer failed:', err)
@@ -658,18 +628,14 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		const fetchPlaylists = async () => {
 			try {
 				setLoading(true)
+
+				// Fetch playlists from Spotify API
 				const spotifyService = new SpotifyService(accessToken)
 				const response = await spotifyService.getCurrentUserPlaylists()
 				setPlaylists(response.items)
 
-				// Save each playlist to database
-				for (const playlist of response.items) {
-					try {
-						await playlistStore.saveSpotifyPlaylist(playlist)
-					} catch (err) {
-						console.error('Failed to save playlist to database:', err)
-					}
-				}
+				// Fetch synced playlists from database (to show sync status)
+				await playlistStore.fetchPlaylists('spotify')
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
 				setError('Failed to load playlists')
@@ -729,8 +695,8 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 											<path d='M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424c-.18.295-.563.387-.857.207-2.35-1.434-5.305-1.76-8.786-.963-.335.077-.67-.133-.746-.469-.077-.336.132-.67.469-.746 3.809-.871 7.077-.496 9.713 1.115.294.18.386.563.207.856zm1.223-2.723c-.226.367-.706.482-1.073.257-2.687-1.652-6.785-2.131-9.965-1.166-.413.125-.849-.106-.973-.518-.125-.413.106-.849.518-.973 3.632-1.102 8.147-.568 11.238 1.327.366.226.481.706.255 1.073zm.105-2.835C14.692 8.50 9.375 8.775 6.297 9.71c-.493.15-1.016-.128-1.166-.622-.149-.493.129-1.016.622-1.165 3.532-1.073 9.404-.865 13.115 1.338.445.264.590.837.326 1.282-.264.444-.838.590-1.282.326z' />
 										</svg>
 
-										{/* YouTube Icon - Show only if successfully transferred */}
-										{successfulTransfers.has(playlist.id) && (
+										{/* YouTube Icon - Show if synced or just transferred */}
+										{(isPlaylistSyncedInDB(playlist.id) || successfulTransfers.has(playlist.id)) && (
 											<div className='flex items-center gap-1'>
 												<svg className='w-4 h-4' viewBox='0 0 24 24' aria-label='YouTube'>
 													<title>YouTube</title>
@@ -739,9 +705,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 														d='M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'
 													/>
 												</svg>
-												{/* Sync Icon - Show only if synced */}
-												{syncStore.isPlaylistLinked(playlist.id) && (
-													<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' />
+												{/* Sync Icon - Show if synced in DB */}
+												{isPlaylistSyncedInDB(playlist.id) && (
+													<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' title='Synced' />
 												)}
 											</div>
 										)}
@@ -779,17 +745,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 											Export as JSON
 										</DropdownMenu.Item>
 
-										{/* Show Sync option only for successfully transferred playlists that aren't already synced */}
-										{successfulTransfers.has(playlist.id) && !syncStore.isPlaylistLinked(playlist.id) && (
-											<DropdownMenu.Item
-												className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
-												onClick={() => handleSyncPlaylist(playlist)}
-											>
-												<Link2Icon className='w-4 h-4' />
-												Sync
-											</DropdownMenu.Item>
-										)}
-
+	
 										<DropdownMenu.Item
 											className='px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded cursor-pointer outline-none flex items-center gap-2 transition-smooth'
 											onClick={() => transferToYouTube(playlist)}

@@ -87,7 +87,8 @@ src/
 │   └── LoginScreen.tsx     # Platform authentication
 ├── stores/              # MobX state management
 │   ├── AuthStore.ts        # Authentication state
-│   ├── SyncStore.ts        # Playlist synchronization
+│   ├── SyncStore.ts        # In-memory playlist sync (for reordering)
+│   ├── PlaylistStore.ts    # Database persistence layer
 │   └── StoreContext.tsx    # React context provider
 ├── services/            # External API clients
 │   ├── spotify.ts          # Spotify Web API client
@@ -96,6 +97,7 @@ src/
 │   ├── spotify.ts          # Spotify API types
 │   ├── youtube.ts          # YouTube API types
 │   ├── platform.ts         # Platform enums
+│   ├── pocketbase.ts       # PocketBase collection types
 │   └── export.ts           # Playlist export format types
 ├── utils/               # Utility functions
 │   └── exportPlaylist.ts   # JSON export utilities
@@ -103,6 +105,17 @@ src/
     ├── Login.tsx
     ├── Playlists.tsx
     └── Search.tsx
+
+pocketbase/              # Backend database
+├── pb_migrations/          # Auto-generated schema migrations
+│   ├── 1773957982_created_playlists.js
+│   ├── 1773958091_updated_playlists.js
+│   └── 1773958138_updated_playlists.js
+├── pb_data/                # Runtime data (gitignored)
+│   ├── data.db             # SQLite database
+│   └── storage/            # File uploads
+├── pocketbase              # Binary executable (gitignored)
+└── README.md               # Setup instructions
 ```
 
 ## 🔐 Authentication Flow
@@ -144,21 +157,106 @@ const youtubeResults = await youtubeService.searchTracks(searchQuery, 1)
 - **Status Indicators**: Clear visual feedback (success/warning/error)
 - **Detailed Reporting**: Show exact success/failure counts
 
-## 🔄 Synchronization Features
+## 🔄 Synchronization & Persistence
 
-### Playlist Linking
-- **Automatic Linking**: Connect Spotify and YouTube playlists after transfer
-- **Sync Status**: Visual indicators showing linked playlists
-- **Real-time Updates**: When tracks added to Spotify, automatically sync to YouTube
+### Sync Persistence Strategy (Hybrid Approach)
 
-### Sync Management Store
+Shelf uses a **minimal database approach** - only synced playlists are saved to the database:
+
+**On Page Load:**
+- Fetch playlists from Spotify API (fresh data)
+- Fetch synced playlists from database (to show sync status)
+- Match and display sync icons (🔗) for linked playlists
+
+**When Transferring to YouTube:**
+- Create YouTube playlist
+- Transfer all tracks
+- **Automatically save both playlists to database**
+- **Link them together** (`synced_with` bidirectional array)
+- Update `last_synced` timestamp
+- Show sync icon immediately
+
+**Benefits:**
+- ✅ Sync relationships persist across sessions
+- ✅ No duplicate YouTube playlists created
+- ✅ Minimal database usage (only synced playlists)
+- ✅ Fast page loads (1 DB query vs 10+)
+- ✅ Clear UI feedback with persistent sync icons
+
+### Database Schema
+
+```typescript
+interface PlaylistRecord {
+  platform: 'spotify' | 'google' | 'apple'
+  platform_id: string        // Original playlist ID from platform
+  name: string
+  description: string
+  image_url: string
+  track_count: number
+  external_url: string
+  synced_with: string[]      // Array of linked PocketBase record IDs
+  last_synced?: string       // ISO datetime
+  user: string               // Relation to users collection
+}
+```
+
+**Example after syncing:**
+```json
+// Spotify record
+{
+  "id": "pb_rec_123",
+  "platform": "spotify",
+  "platform_id": "37i9dQZF1DX...",
+  "synced_with": ["pb_rec_456"],
+  "last_synced": "2026-03-19T20:00:00Z"
+}
+
+// YouTube record (linked)
+{
+  "id": "pb_rec_456",
+  "platform": "google",
+  "platform_id": "PLrAXtmErZ...",
+  "synced_with": ["pb_rec_123"],
+  "last_synced": "2026-03-19T20:00:00Z"
+}
+```
+
+### Sync Management Stores
+
+**PlaylistStore** (Database persistence):
+```typescript
+class PlaylistStore {
+  saveSpotifyPlaylists(playlists: SpotifyPlaylist[]): Promise<void>
+  saveYouTubePlaylist(playlist: YouTubePlaylist): Promise<PlaylistRecord>
+  linkPlaylists(id1: string, id2: string): Promise<void>
+  fetchPlaylists(platform?: Platform): Promise<PlaylistRecord[]>
+  isSynced(playlistId: string): boolean
+  getSyncedPlaylists(playlistId: string): PlaylistRecord[]
+}
+```
+
+**SyncStore** (In-memory for track reordering):
 ```typescript
 class SyncStore {
   linkPlaylists(spotifyId: string, youtubeId: string, youtubeUrl: string)
-  isPlaylistLinked(spotifyId: string): boolean
-  updateLastSync(spotifyId: string): void
+  addYouTubeTrackMapping(spotifyPlaylistId, spotifyTrackId, youtubePlaylistItemId, youtubeVideoId)
+  getYouTubeTrackMapping(spotifyPlaylistId, spotifyTrackId): YouTubeTrackMapping
 }
 ```
+
+### User Flow Example
+
+1. **First Visit**: User transfers "Today's Top Hits" to YouTube
+   - YouTube playlist created
+   - Both playlists saved to DB with bidirectional link
+   - Sync icon (🔗) appears
+
+2. **Next Visit** (reload page):
+   - Playlists loaded from Spotify API
+   - Synced playlists loaded from DB
+   - Sync icon persists (shows "Today's Top Hits" is linked)
+   - If user clicks "Transfer to YouTube" again, creates NEW YouTube playlist
+   - Original sync link remains intact
 
 ## 📦 Playlist Export System
 
