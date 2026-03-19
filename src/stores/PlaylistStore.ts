@@ -145,7 +145,7 @@ export class PlaylistStore {
 				name: youtubePlaylist.snippet.title,
 				description: youtubePlaylist.snippet.description || '',
 				image_url: youtubePlaylist.snippet.thumbnails.default?.url || '',
-				track_count: youtubePlaylist.contentDetails.itemCount,
+				track_count: youtubePlaylist.contentDetails?.itemCount ?? 0,
 				external_url: `https://www.youtube.com/playlist?list=${youtubePlaylist.id}`,
 			}
 

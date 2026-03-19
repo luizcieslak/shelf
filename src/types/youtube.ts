@@ -32,7 +32,7 @@ export interface YouTubePlaylist {
 			description: string
 		}
 	}
-	contentDetails: {
+	contentDetails?: {
 		itemCount: number
 	}
 }
