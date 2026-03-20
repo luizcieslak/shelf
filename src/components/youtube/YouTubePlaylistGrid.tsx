@@ -336,7 +336,10 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 
 										{/* Sync Link Icon - Show if synced in DB */}
 										{isPlaylistSyncedInDB(playlist.id) && (
-											<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' title='Synced' />
+											<span title='Synced with another platform'>
+												<Link2Icon className='w-3 h-3 text-blue-600' aria-hidden='true' />
+												<span className='sr-only'>Synced</span>
+											</span>
 										)}
 
 										{/* Spotify Icon - Show if successfully transferred OR synced in DB */}
@@ -353,7 +356,7 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 										)}
 									</div>
 								</div>
-								<p className='text-sm text-gray-600 mb-2'>{playlist.contentDetails.itemCount} tracks</p>
+								<p className='text-sm text-gray-600 mb-2'>{playlist.contentDetails?.itemCount ?? 0} tracks</p>
 							</div>
 
 							{/* Transfer Action */}

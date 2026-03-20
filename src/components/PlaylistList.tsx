@@ -707,7 +707,10 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 												</svg>
 												{/* Sync Icon - Show if synced in DB */}
 												{isPlaylistSyncedInDB(playlist.id) && (
-													<Link2Icon className='w-3 h-3 text-blue-600' aria-label='Synced' title='Synced' />
+													<span title='Synced with another platform'>
+														<Link2Icon className='w-3 h-3 text-blue-600' aria-hidden='true' />
+														<span className='sr-only'>Synced</span>
+													</span>
 												)}
 											</div>
 										)}
