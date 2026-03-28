@@ -32,6 +32,30 @@ export class YouTubeService {
 		return response.json()
 	}
 
+	async getPlaylistById(playlistId: string): Promise<YouTubePlaylist> {
+		const response = await fetch(
+			`https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${playlistId}`,
+			{
+				headers: {
+					Authorization: `Bearer ${this.accessToken}`,
+					'Content-Type': 'application/json',
+				},
+			},
+		)
+
+		if (!response.ok) {
+			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+		}
+
+		const data: YouTubePlaylistsResponse = await response.json()
+
+		if (!data.items || data.items.length === 0) {
+			throw new Error(`Playlist not found: ${playlistId}`)
+		}
+
+		return data.items[0]
+	}
+
 	async getPlaylistItems(
 		playlistId: string,
 		maxResults = 50,
