@@ -77,7 +77,7 @@ export class SpotifyService {
 		}
 	}
 
-	async searchTracks(query: string, limit = 20): Promise<SpotifySearchResponse> {
+	async searchTracks(query: string, limit = 10): Promise<SpotifySearchResponse> {
 		const response = await fetch(
 			`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`,
 			{
