@@ -4,12 +4,21 @@ import type {
 	YouTubePlaylistsResponse,
 	YouTubeSearchResponse,
 } from '../types/youtube'
+import { parseYouTubeError } from '../utils/youtubeErrors'
 
 export class YouTubeService {
 	private accessToken: string
 
 	constructor(accessToken: string) {
 		this.accessToken = accessToken
+	}
+
+	/**
+	 * Handle YouTube API errors with quota detection
+	 */
+	private async handleError(response: Response): Promise<never> {
+		const error = await parseYouTubeError(response)
+		throw new Error(error.userFriendlyMessage)
 	}
 
 	async getCurrentUserPlaylists(maxResults = 50, pageToken?: string): Promise<YouTubePlaylistsResponse> {
@@ -26,7 +35,7 @@ export class YouTubeService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		return response.json()
@@ -44,7 +53,7 @@ export class YouTubeService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		const data: YouTubePlaylistsResponse = await response.json()
@@ -74,7 +83,7 @@ export class YouTubeService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		return response.json()
@@ -118,7 +127,7 @@ export class YouTubeService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		return response.json()
@@ -144,7 +153,7 @@ export class YouTubeService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`YouTube API error: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		const result = await response.json()
@@ -183,7 +192,7 @@ export class YouTubeService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Failed to add track to playlist: ${response.status} ${response.statusText}`)
+			await this.handleError(response)
 		}
 
 		const result = await response.json()
@@ -216,7 +225,7 @@ export class YouTubeService {
 		)
 
 		if (!deleteResponse.ok) {
-			throw new Error(`Failed to delete playlist item: ${deleteResponse.status} ${deleteResponse.statusText}`)
+			await this.handleError(deleteResponse)
 		}
 
 		// Step 2: Re-insert at new position
@@ -239,7 +248,7 @@ export class YouTubeService {
 		})
 
 		if (!insertResponse.ok) {
-			throw new Error(`Failed to insert playlist item: ${insertResponse.status} ${insertResponse.statusText}`)
+			await this.handleError(insertResponse)
 		}
 	}
 }
