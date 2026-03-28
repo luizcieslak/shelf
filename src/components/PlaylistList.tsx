@@ -40,6 +40,7 @@ import { useStores } from '../stores/StoreContext'
 import type { SpotifyPlaylist, SpotifyTrack } from '../types/spotify'
 import type { YouTubePlaylist } from '../types/youtube'
 import { downloadPlaylistAsJson } from '../utils/exportPlaylist'
+import { getYouTubeErrorMessage } from '../utils/youtubeErrors'
 import AddTracksDialog from './AddTracksDialog'
 
 interface PlaylistListProps {
@@ -651,7 +652,8 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					console.error(`Failed to add track: ${track.name}`, err)
 
 					// Check for quota exceeded error
-					if (err?.message?.includes('quotaExceeded') || err?.message?.includes('403')) {
+					const errorMessage = getYouTubeErrorMessage(err)
+					if (errorMessage.includes('quota')) {
 						setTransferProgress(prev => ({
 							...prev,
 							[playlist.id]: [
@@ -670,7 +672,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 								{
 									step: 'completed',
 									status: 'warning',
-									message: `⚠️ YouTube API quota exceeded. Synced ${successCount}/${totalTracks} tracks. Click "Continue Sync" to resume later.`,
+									message: `${errorMessage} Progress saved: ${successCount}/${totalTracks} tracks synced. Click "Continue Sync" to resume later.`,
 									tracksAdded: successCount,
 									totalTracks: totalTracks,
 									playlistUrl: youtubePlaylistUrl,

@@ -12,6 +12,7 @@ import { SpotifyService } from '../../services/spotify'
 import { YouTubeService } from '../../services/youtube'
 import { useStores } from '../../stores/StoreContext'
 import type { YouTubePlaylist, YouTubePlaylistItem } from '../../types/youtube'
+import { getYouTubeErrorMessage } from '../../utils/youtubeErrors'
 
 interface YouTubePlaylistGridProps {
 	accessToken: string
@@ -280,7 +281,7 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 				await playlistStore.fetchPlaylists('google')
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
-				setError('Failed to load playlists')
+				setError(getYouTubeErrorMessage(err))
 			} finally {
 				setLoading(false)
 			}
@@ -298,7 +299,18 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 	}
 
 	if (error) {
-		return <div className='bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md'>{error}</div>
+		const isQuotaError = error.includes('quota')
+		return (
+			<div
+				className={`${
+					isQuotaError
+						? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+						: 'bg-red-50 border border-red-200 text-red-700'
+				} px-4 py-3 rounded-md`}
+			>
+				{error}
+			</div>
+		)
 	}
 
 	return (
