@@ -38,6 +38,7 @@ import { SpotifyService } from '../services/spotify'
 import { YouTubeService } from '../services/youtube'
 import { useStores } from '../stores/StoreContext'
 import type { SpotifyPlaylist, SpotifyTrack } from '../types/spotify'
+import type { YouTubePlaylist } from '../types/youtube'
 import { downloadPlaylistAsJson } from '../utils/exportPlaylist'
 import AddTracksDialog from './AddTracksDialog'
 
@@ -184,6 +185,27 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			p => p.platform === 'spotify' && p.platform_id === spotifyPlaylistId
 		)
 		return dbRecord ? (dbRecord.synced_with?.length || 0) > 0 : false
+	}
+
+	// Helper to get transfer button text based on sync status
+	const getTransferButtonText = (playlist: SpotifyPlaylist): string => {
+		const dbRecord = playlistStore.playlists.find(
+			p => p.platform === 'spotify' && p.platform_id === playlist.id
+		)
+
+		if (!dbRecord || !dbRecord.synced_with || dbRecord.synced_with.length === 0) {
+			return 'Transfer to YouTube'
+		}
+
+		// Check if synced YouTube playlist exists
+		const syncedYoutubeRecords = playlistStore.playlists.filter(p => dbRecord.synced_with?.includes(p.id))
+
+		if (syncedYoutubeRecords.length === 0) {
+			return 'Transfer to YouTube'
+		}
+
+		// We can't check track counts here without async call, but we can show "Continue Sync" if synced
+		return 'Continue Sync'
 	}
 
 	const sensors = useSensors(
@@ -462,48 +484,117 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		}
 
 		setTransferringPlaylist(playlist.id)
-		setTransferProgress(prev => ({
-			...prev,
-			[playlist.id]: [
-				{
-					step: 'creating',
-					status: 'loading',
-					message: 'Creating a new playlist...',
-				},
-			],
-		}))
 
 		try {
 			const youtubeService = new YouTubeService(authStore.google.accessToken)
 
-			// Step 1: Create playlist
-			const createdPlaylist = await youtubeService.createPlaylist(playlist.name, playlist.description || '')
-			const playlistUrl = `https://www.youtube.com/playlist?list=${createdPlaylist.id}`
+			// Check if playlist is already synced (resume mode)
+			const dbRecord = playlistStore.playlists.find(
+				p => p.platform === 'spotify' && p.platform_id === playlist.id
+			)
+			const syncedYoutubeRecords = dbRecord?.synced_with
+				? playlistStore.playlists.filter(p => dbRecord.synced_with?.includes(p.id))
+				: []
 
-			// Save YouTube playlist to database
-			try {
-				await playlistStore.saveYouTubePlaylist(createdPlaylist)
-			} catch (err) {
-				console.error('Failed to save YouTube playlist to database:', err)
+			let youtubePlaylist: YouTubePlaylist | null = null
+			let youtubePlaylistUrl = ''
+			let startFromIndex = 0
+			let isResumeMode = false
+
+			// If synced, try to fetch the YouTube playlist to check track count
+			if (syncedYoutubeRecords.length > 0) {
+				const syncedYoutube = syncedYoutubeRecords[0] // Get first synced YouTube playlist
+				try {
+					youtubePlaylist = await youtubeService.getPlaylistById(syncedYoutube.platform_id)
+					const youtubeTrackCount = youtubePlaylist.contentDetails?.itemCount ?? 0
+					const spotifyTrackCount = playlist.items?.total ?? 0
+
+					if (youtubeTrackCount < spotifyTrackCount) {
+						// Resume mode: Start from where we left off
+						startFromIndex = youtubeTrackCount
+						isResumeMode = true
+						youtubePlaylistUrl = `https://www.youtube.com/playlist?list=${youtubePlaylist.id}`
+
+						setTransferProgress(prev => ({
+							...prev,
+							[playlist.id]: [
+								{
+									step: 'creating',
+									status: 'success',
+									message: `Resuming sync (${youtubeTrackCount}/${spotifyTrackCount} already synced)...`,
+								},
+								{
+									step: 'adding',
+									status: 'loading',
+									message: `Continuing from track ${youtubeTrackCount + 1}...`,
+								},
+							],
+						}))
+					} else if (youtubeTrackCount >= spotifyTrackCount) {
+						// Already fully synced
+						setTransferProgress(prev => ({
+							...prev,
+							[playlist.id]: [
+								{
+									step: 'completed',
+									status: 'success',
+									message: `Playlist already fully synced (${youtubeTrackCount} tracks)`,
+									tracksAdded: youtubeTrackCount,
+									totalTracks: spotifyTrackCount,
+									playlistUrl: `https://www.youtube.com/playlist?list=${youtubePlaylist!.id}`,
+								},
+							],
+						}))
+						setTransferringPlaylist(null)
+						return
+					}
+				} catch (err) {
+					console.error('Failed to fetch synced YouTube playlist:', err)
+					// Fallback to creating new playlist
+				}
 			}
 
-			setTransferProgress(prev => ({
-				...prev,
-				[playlist.id]: [
-					{
-						step: 'creating',
-						status: 'success',
-						message: 'Creating a new playlist...',
-					},
-					{
-						step: 'adding',
-						status: 'loading',
-						message: 'Adding the tracks to the created playlist...',
-					},
-				],
-			}))
+			// If not resuming, create new playlist
+			if (!isResumeMode) {
+				setTransferProgress(prev => ({
+					...prev,
+					[playlist.id]: [
+						{
+							step: 'creating',
+							status: 'loading',
+							message: 'Creating a new playlist...',
+						},
+					],
+				}))
 
-			// Step 2: Add tracks
+				youtubePlaylist = await youtubeService.createPlaylist(playlist.name, playlist.description || '')
+				youtubePlaylistUrl = `https://www.youtube.com/playlist?list=${youtubePlaylist.id}`
+
+				// Save YouTube playlist to database
+				try {
+					await playlistStore.saveYouTubePlaylist(youtubePlaylist)
+				} catch (err) {
+					console.error('Failed to save YouTube playlist to database:', err)
+				}
+
+				setTransferProgress(prev => ({
+					...prev,
+					[playlist.id]: [
+						{
+							step: 'creating',
+							status: 'success',
+							message: 'Creating a new playlist...',
+						},
+						{
+							step: 'adding',
+							status: 'loading',
+							message: 'Adding the tracks to the created playlist...',
+						},
+					],
+				}))
+			}
+
+			// Step 2: Add tracks (starting from startFromIndex)
 			const tracks = await fetchPlaylistTracks(playlist.id)
 
 			if (tracks.length === 0) {
@@ -513,7 +604,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 						{
 							step: 'creating',
 							status: 'success',
-							message: 'Creating a new playlist...',
+							message: isResumeMode ? 'Resuming sync...' : 'Creating a new playlist...',
 						},
 						{
 							step: 'adding',
@@ -526,13 +617,14 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				return
 			}
 
-			let successCount = 0
+			let successCount = startFromIndex
 			const totalTracks = tracks.length
+			const tracksToSync = tracks.slice(startFromIndex)
 
-			for (const track of tracks) {
+			for (const track of tracksToSync) {
 				try {
 					const searchQuery = `${track.name} ${track.artists.map(a => a.name).join(' ')}`
-					await youtubeService.addTrackToPlaylist(createdPlaylist.id, searchQuery)
+					await youtubeService.addTrackToPlaylist(youtubePlaylist!.id, searchQuery)
 					successCount++
 
 					// Update progress after each track
@@ -542,7 +634,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 							{
 								step: 'creating',
 								status: 'success',
-								message: 'Creating a new playlist...',
+								message: isResumeMode
+									? `Resuming sync (${startFromIndex}/${totalTracks} already synced)...`
+									: 'Creating a new playlist...',
 							},
 							{
 								step: 'adding',
@@ -553,8 +647,61 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 							},
 						],
 					}))
-				} catch (err) {
+				} catch (err: any) {
 					console.error(`Failed to add track: ${track.name}`, err)
+
+					// Check for quota exceeded error
+					if (err?.message?.includes('quotaExceeded') || err?.message?.includes('403')) {
+						setTransferProgress(prev => ({
+							...prev,
+							[playlist.id]: [
+								{
+									step: 'creating',
+									status: 'success',
+									message: isResumeMode
+										? `Resuming sync (${startFromIndex}/${totalTracks} already synced)...`
+										: 'Creating a new playlist...',
+								},
+								{
+									step: 'adding',
+									status: 'warning',
+									message: `Added ${successCount}/${totalTracks} tracks`,
+								},
+								{
+									step: 'completed',
+									status: 'warning',
+									message: `⚠️ YouTube API quota exceeded. Synced ${successCount}/${totalTracks} tracks. Click "Continue Sync" to resume later.`,
+									tracksAdded: successCount,
+									totalTracks: totalTracks,
+									playlistUrl: youtubePlaylistUrl,
+								},
+							],
+						}))
+
+						// Save sync even if incomplete
+						if (successCount > startFromIndex) {
+							try {
+								if (!isResumeMode) {
+									const spotifyRecord = await playlistStore.saveSpotifyPlaylist(playlist)
+									const youtubeRecord = await playlistStore.saveYouTubePlaylist(youtubePlaylist!)
+									await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
+									syncStore.linkPlaylists(playlist.id, youtubePlaylist!.id, youtubePlaylistUrl)
+								}
+								// Update last_synced timestamp
+								const youtubeDbRecord = playlistStore.playlists.find(
+									p => p.platform === 'google' && p.platform_id === youtubePlaylist!.id
+								)
+								if (youtubeDbRecord) {
+									await playlistStore.updateLastSync(youtubeDbRecord.id)
+								}
+							} catch (dbErr) {
+								console.error('Failed to save partial sync:', dbErr)
+							}
+						}
+
+						setTransferringPlaylist(null)
+						return
+					}
 				}
 			}
 
@@ -568,7 +715,9 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					{
 						step: 'creating',
 						status: 'success',
-						message: 'Creating a new playlist...',
+						message: isResumeMode
+							? `Resuming sync (${startFromIndex}/${totalTracks} already synced)...`
+							: 'Creating a new playlist...',
 					},
 					{
 						step: 'adding',
@@ -578,10 +727,12 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					{
 						step: 'completed',
 						status: finalStatus,
-						message: `Transfer complete: ${successCount}/${totalTracks} tracks`,
+						message: isResumeMode
+							? `Sync resumed: ${successCount}/${totalTracks} tracks synced`
+							: `Transfer complete: ${successCount}/${totalTracks} tracks`,
 						tracksAdded: successCount,
 						totalTracks: totalTracks,
-						playlistUrl: playlistUrl,
+						playlistUrl: youtubePlaylistUrl,
 					},
 				],
 			}))
@@ -592,17 +743,21 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 
 				// Automatically save sync to database
 				try {
-					const spotifyRecord = await playlistStore.saveSpotifyPlaylist(playlist)
-					const youtubeRecord = await playlistStore.saveYouTubePlaylist(createdPlaylist)
-					await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
+					if (!isResumeMode) {
+						const spotifyRecord = await playlistStore.saveSpotifyPlaylist(playlist)
+						const youtubeRecord = await playlistStore.saveYouTubePlaylist(youtubePlaylist!)
+						await playlistStore.linkPlaylists(spotifyRecord.id, youtubeRecord.id)
 
-					// Link in memory for reordering
-					syncStore.linkPlaylists(playlist.id, createdPlaylist.id, playlistUrl)
+						// Link in memory for reordering
+						syncStore.linkPlaylists(playlist.id, youtubePlaylist!.id, youtubePlaylistUrl)
 
-					console.log('✅ Sync saved to database:', {
-						spotify: spotifyRecord.name,
-						youtube: youtubeRecord.name,
-					})
+						console.log('✅ Sync saved to database:', {
+							spotify: spotifyRecord.name,
+							youtube: youtubeRecord.name,
+						})
+					} else {
+						console.log('✅ Sync resumed and updated')
+					}
 				} catch (err) {
 					console.error('Failed to save sync to database:', err)
 				}
@@ -616,6 +771,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					{
 						...prev[playlist.id][prev[playlist.id].length - 1],
 						status: 'error',
+						message: 'Transfer failed. Please try again.',
 					},
 				],
 			}))
@@ -761,7 +917,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 													d='M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z'
 												/>
 											</svg>
-											Transfer to YouTube
+											{getTransferButtonText(playlist)}
 										</DropdownMenu.Item>
 									</DropdownMenu.Content>
 								</DropdownMenu.Portal>
