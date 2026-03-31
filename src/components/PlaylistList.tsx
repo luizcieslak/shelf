@@ -194,19 +194,12 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			p => p.platform === 'spotify' && p.platform_id === playlist.id
 		)
 
-		if (!dbRecord || !dbRecord.synced_with || dbRecord.synced_with.length === 0) {
-			return 'Transfer to YouTube'
+		// If synced_with exists and has entries, show "Continue Sync"
+		if (dbRecord?.synced_with && dbRecord.synced_with.length > 0) {
+			return 'Continue Sync'
 		}
 
-		// Check if synced YouTube playlist exists
-		const syncedYoutubeRecords = playlistStore.playlists.filter(p => dbRecord.synced_with?.includes(p.id))
-
-		if (syncedYoutubeRecords.length === 0) {
-			return 'Transfer to YouTube'
-		}
-
-		// We can't check track counts here without async call, but we can show "Continue Sync" if synced
-		return 'Continue Sync'
+		return 'Transfer to YouTube'
 	}
 
 	const sensors = useSensors(
@@ -551,7 +544,26 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					}
 				} catch (err) {
 					console.error('Failed to fetch synced YouTube playlist:', err)
-					// Fallback to creating new playlist
+
+					// Check if it's a quota error
+					const errorMessage = getYouTubeErrorMessage(err)
+					if (errorMessage.includes('quota')) {
+						setTransferProgress(prev => ({
+							...prev,
+							[playlist.id]: [
+								{
+									step: 'completed',
+									status: 'error',
+									message: errorMessage,
+								},
+							],
+						}))
+						setTransferringPlaylist(null)
+						return
+					}
+
+					// For other errors, fallback to creating new playlist
+					console.warn('Could not fetch synced playlist, will create new one')
 				}
 			}
 
@@ -792,8 +804,27 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				const response = await spotifyService.getCurrentUserPlaylists()
 				setPlaylists(response.items)
 
-				// Fetch synced playlists from database (to show sync status)
-				await playlistStore.fetchPlaylists('spotify')
+				// Fetch ALL synced playlists from database (both Spotify and YouTube)
+				await playlistStore.fetchPlaylists()
+
+				// Restore SyncStore from database (for track reordering to work)
+				const spotifyPlaylists = playlistStore.playlists.filter(p => p.platform === 'spotify')
+				for (const spotifyPlaylist of spotifyPlaylists) {
+					if (spotifyPlaylist.synced_with && spotifyPlaylist.synced_with.length > 0) {
+						// Find the linked YouTube playlist
+						const youtubePlaylist = playlistStore.playlists.find(
+							p => p.platform === 'google' && spotifyPlaylist.synced_with?.includes(p.id)
+						)
+						if (youtubePlaylist) {
+							// Restore the link in SyncStore
+							syncStore.linkPlaylists(
+								spotifyPlaylist.platform_id,
+								youtubePlaylist.platform_id,
+								youtubePlaylist.external_url
+							)
+						}
+					}
+				}
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
 				setError('Failed to load playlists')
@@ -803,7 +834,7 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 		}
 
 		fetchPlaylists()
-	}, [accessToken, playlistStore])
+	}, [accessToken, playlistStore, syncStore])
 
 	if (loading) {
 		return (
