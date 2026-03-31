@@ -1,4 +1,5 @@
 import { observer } from 'mobx-react-lite'
+import { useState } from 'react'
 import { Link, Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import Login from './pages/Login'
 import Playlists from './pages/Playlists'
@@ -62,46 +63,118 @@ const App = observer(() => {
 		}
 	}
 
-	const Navigation = () => (
-		<nav className='bg-white shadow-sm border-b'>
-			<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
-				<div className='flex justify-between h-16'>
-					<div className='flex items-center space-x-8'>
-						<h1 className='text-xl font-bold text-gray-900'>Shelf</h1>
-						<Link
-							to='/playlists'
-							className='inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600'
-						>
-							Playlists
-						</Link>
-						{/* <Link to="/search" className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600">
-							Search
-						</Link> */}
-					</div>
-					<div className='flex items-center space-x-4'>
-						<div className='flex gap-2'>
-							{authStore.connectedPlatforms.map(platform => (
-								<div
-									key={platform}
-									className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}
-								>
-									{getPlatformIcon(platform)}
-									<span className='text-xs'>{getPlatformName(platform)}</span>
-								</div>
-							))}
+	const Navigation = () => {
+		const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+		return (
+			<nav className='bg-white shadow-sm border-b'>
+				<div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+					<div className='flex justify-between h-16'>
+						{/* Logo and desktop navigation */}
+						<div className='flex items-center space-x-8'>
+							<h1 className='text-xl font-bold text-gray-900'>Shelf</h1>
+							<Link
+								to='/playlists'
+								className='hidden sm:inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-900 hover:text-blue-600'
+							>
+								Playlists
+							</Link>
 						</div>
-						<button
-							type='button'
-							onClick={() => authStore.disconnectAll()}
-							className='inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700'
-						>
-							Disconnect All
-						</button>
+
+						{/* Desktop right side */}
+						<div className='hidden md:flex items-center space-x-4'>
+							<div className='flex gap-2'>
+								{authStore.connectedPlatforms.map(platform => (
+									<div
+										key={platform}
+										className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}
+									>
+										{getPlatformIcon(platform)}
+										<span className='text-xs'>{getPlatformName(platform)}</span>
+									</div>
+								))}
+							</div>
+							<button
+								type='button'
+								onClick={() => authStore.disconnectAll()}
+								className='inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700'
+							>
+								Disconnect All
+							</button>
+						</div>
+
+						{/* Mobile hamburger button */}
+						<div className='md:hidden flex items-center'>
+							<button
+								type='button'
+								onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+								className='inline-flex items-center justify-center p-2 rounded-md text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500'
+								aria-label='Toggle menu'
+							>
+								{mobileMenuOpen ? (
+									<svg className='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor' aria-hidden='true'>
+										<title>Close menu</title>
+										<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M6 18L18 6M6 6l12 12' />
+									</svg>
+								) : (
+									<svg className='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor' aria-hidden='true'>
+										<title>Open menu</title>
+										<path strokeLinecap='round' strokeLinejoin='round' strokeWidth={2} d='M4 6h16M4 12h16M4 18h16' />
+									</svg>
+								)}
+							</button>
+						</div>
 					</div>
 				</div>
-			</div>
-		</nav>
-	)
+
+				{/* Mobile menu */}
+				{mobileMenuOpen && (
+					<div className='md:hidden border-t border-gray-200'>
+						<div className='px-4 py-3 space-y-3'>
+							{/* Navigation links */}
+							<Link
+								to='/playlists'
+								className='block px-3 py-2 rounded-md text-base font-medium text-gray-900 hover:bg-gray-50'
+								onClick={() => setMobileMenuOpen(false)}
+							>
+								Playlists
+							</Link>
+
+							{/* Connected platforms */}
+							<div className='px-3 py-2'>
+								<div className='text-xs font-semibold text-gray-500 uppercase mb-2'>Connected</div>
+								<div className='flex flex-wrap gap-2'>
+									{authStore.connectedPlatforms.map(platform => (
+										<div
+											key={platform}
+											className={`flex items-center gap-1 px-2 py-1 rounded ${getPlatformColor(platform)}`}
+										>
+											{getPlatformIcon(platform)}
+											<span className='text-xs'>{getPlatformName(platform)}</span>
+										</div>
+									))}
+								</div>
+							</div>
+
+							{/* Disconnect button */}
+							<div className='px-3'>
+								<button
+									type='button'
+									onClick={() => {
+										authStore.disconnectAll()
+										setMobileMenuOpen(false)
+									}}
+									className='w-full inline-flex items-center justify-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-red-600 hover:bg-red-700'
+								>
+									Disconnect All
+								</button>
+							</div>
+						</div>
+					</div>
+				)}
+			</nav>
+		)
+	}
 
 	return (
 		<Router>

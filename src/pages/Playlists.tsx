@@ -34,41 +34,43 @@ const Playlists = observer(() => {
 		if (!authStore.google?.accessToken) disconnectedPlatforms.push('google')
 
 		return (
-			<div className='mb-6 flex gap-2 items-center'>
-				{availablePlatforms.includes('spotify') && (
-					<button
-						type='button'
-						onClick={() => setSelectedPlatform('spotify')}
-						className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-							selectedPlatform === 'spotify'
-								? 'bg-green-600 text-white'
-								: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-						}`}
-					>
-						Spotify Playlists
-					</button>
-				)}
-				{availablePlatforms.includes('google') && (
-					<button
-						type='button'
-						onClick={() => setSelectedPlatform('google')}
-						className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-							selectedPlatform === 'google'
-								? 'bg-red-600 text-white'
-								: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-						}`}
-					>
-						YouTube Playlists
-					</button>
-				)}
+			<div className='mb-6 flex flex-col sm:flex-row gap-2 sm:items-center'>
+				<div className='flex gap-2 flex-wrap'>
+					{availablePlatforms.includes('spotify') && (
+						<button
+							type='button'
+							onClick={() => setSelectedPlatform('spotify')}
+							className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+								selectedPlatform === 'spotify'
+									? 'bg-green-600 text-white'
+									: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+							}`}
+						>
+							Spotify Playlists
+						</button>
+					)}
+					{availablePlatforms.includes('google') && (
+						<button
+							type='button'
+							onClick={() => setSelectedPlatform('google')}
+							className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm ${
+								selectedPlatform === 'google'
+									? 'bg-red-600 text-white'
+									: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+							}`}
+						>
+							YouTube Playlists
+						</button>
+					)}
+				</div>
 
 				{/* Add Platform Button - Only show if there are platforms to connect */}
 				{disconnectedPlatforms.length > 0 && (
-					<div className='ml-auto'>
+					<div className='sm:ml-auto'>
 						<div className='relative group'>
 							<button
 								type='button'
-								className='px-4 py-2 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors'
+								className='w-full sm:w-auto px-4 py-2 rounded-lg font-medium text-sm bg-blue-600 text-white hover:bg-blue-700 transition-colors'
 							>
 								+ Connect Platform
 							</button>
@@ -173,7 +175,7 @@ const Playlists = observer(() => {
 	}
 
 	return (
-		<div className='min-h-screen bg-gray-50 p-8'>
+		<div className='min-h-screen bg-gray-50 p-4 sm:p-8'>
 			<div className='max-w-7xl mx-auto'>
 				{renderPlatformSelector()}
 				{renderPlaylistView()}
