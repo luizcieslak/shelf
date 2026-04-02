@@ -279,4 +279,15 @@ export class AuthStore {
 			platformAuth.error = null
 		}
 	}
+
+	// Handle token expiry by disconnecting platform and showing notification
+	handleTokenExpiry(platform: Platform, message = 'Your session has expired. Please reconnect.') {
+		console.log(`Token expired for ${platform}:`, message)
+
+		// Disconnect the platform (this will trigger localStorage cleanup via MobX reaction)
+		this.disconnectPlatform(platform)
+
+		// The UI will automatically update since we're using MobX observers
+		// Components can check authStore.connectedPlatforms to show re-auth prompt
+	}
 }

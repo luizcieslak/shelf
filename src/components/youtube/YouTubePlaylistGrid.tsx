@@ -12,6 +12,7 @@ import { SpotifyService } from '../../services/spotify'
 import { YouTubeService } from '../../services/youtube'
 import { useStores } from '../../stores/StoreContext'
 import type { YouTubePlaylist, YouTubePlaylistItem } from '../../types/youtube'
+import { TokenExpiredError } from '../../utils/apiErrors'
 import { getYouTubeErrorMessage } from '../../utils/youtubeErrors'
 
 interface YouTubePlaylistGridProps {
@@ -67,6 +68,12 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 			return response.items
 		} catch (err) {
 			console.error('Error fetching playlist items:', err)
+
+			// Handle token expiry
+			if (err instanceof TokenExpiredError) {
+				authStore.handleTokenExpiry(err.platform, err.message)
+			}
+
 			return []
 		}
 	}
@@ -187,6 +194,13 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 					}))
 				} catch (err) {
 					console.error(`Failed to find track: ${item.snippet.title}`, err)
+
+					// Handle token expiry
+					if (err instanceof TokenExpiredError) {
+						authStore.handleTokenExpiry(err.platform, err.message)
+						setTransferringPlaylist(null)
+						return
+					}
 				}
 			}
 
@@ -246,6 +260,14 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 			}
 		} catch (err) {
 			console.error('Transfer failed:', err)
+
+			// Handle token expiry
+			if (err instanceof TokenExpiredError) {
+				authStore.handleTokenExpiry(err.platform, err.message)
+				setTransferringPlaylist(null)
+				return
+			}
+
 			setTransferProgress(prev => ({
 				...prev,
 				[playlist.id]: [
@@ -281,6 +303,13 @@ const YouTubePlaylistGrid = observer(({ accessToken }: YouTubePlaylistGridProps)
 				await playlistStore.fetchPlaylists('google')
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
+
+				// Handle token expiry
+				if (err instanceof TokenExpiredError) {
+					authStore.handleTokenExpiry(err.platform, err.message)
+					return // Don't set error, just let the auth system handle it
+				}
+
 				setError(getYouTubeErrorMessage(err))
 			} finally {
 				setLoading(false)

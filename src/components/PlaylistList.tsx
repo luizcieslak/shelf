@@ -272,6 +272,12 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			return tracks
 		} catch (err) {
 			console.error('Error fetching playlist tracks:', err)
+
+			// Handle token expiry
+			if (err instanceof TokenExpiredError) {
+				authStore.handleTokenExpiry(err.platform, err.message)
+			}
+
 			return []
 		}
 	}
@@ -412,11 +418,22 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 						}
 					} catch (err) {
 						console.error('Failed to reorder YouTube playlist:', err)
+
+						// Handle token expiry for YouTube
+						if (err instanceof TokenExpiredError) {
+							authStore.handleTokenExpiry(err.platform, err.message)
+						}
 					}
 				}
 			}
 		} catch (err) {
 			console.error('Failed to reorder tracks:', err)
+
+			// Handle token expiry for Spotify
+			if (err instanceof TokenExpiredError) {
+				authStore.handleTokenExpiry(err.platform, err.message)
+			}
+
 			// Revert optimistic update on error
 			setPlaylistTracks(prev => ({
 				...prev,
@@ -424,7 +441,6 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			}))
 		}
 	}
-
 
 	const handleExportPlaylist = async (playlist: SpotifyPlaylist) => {
 		// Fetch tracks if not already loaded
@@ -544,6 +560,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 					}
 				} catch (err) {
 					console.error('Failed to fetch synced YouTube playlist:', err)
+
+					// Handle token expiry
+					if (err instanceof TokenExpiredError) {
+						authStore.handleTokenExpiry(err.platform, err.message)
+						setTransferringPlaylist(null)
+						return
+					}
 
 					// Check if it's a quota error
 					const errorMessage = getYouTubeErrorMessage(err)
@@ -778,6 +801,14 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 			}
 		} catch (err) {
 			console.error('Transfer failed:', err)
+
+			// Handle token expiry
+			if (err instanceof TokenExpiredError) {
+				authStore.handleTokenExpiry(err.platform, err.message)
+				setTransferringPlaylist(null)
+				return
+			}
+
 			setTransferProgress(prev => ({
 				...prev,
 				[playlist.id]: [
@@ -827,6 +858,13 @@ const PlaylistList = observer(({ accessToken }: PlaylistListProps) => {
 				}
 			} catch (err) {
 				console.error('Error fetching playlists:', err)
+
+				// Handle token expiry
+				if (err instanceof TokenExpiredError) {
+					authStore.handleTokenExpiry(err.platform, err.message)
+					return // Don't set error, just let the auth system handle it
+				}
+
 				setError('Failed to load playlists')
 			} finally {
 				setLoading(false)

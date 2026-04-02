@@ -4,6 +4,21 @@ import type {
 	SpotifyPlaylistTracksResponse,
 	SpotifySearchResponse,
 } from '../types/spotify'
+import { TokenExpiredError } from '../utils/apiErrors'
+
+/**
+ * Parse Spotify API error responses
+ * Throws TokenExpiredError on 401 for automatic disconnection
+ */
+async function handleSpotifyError(response: Response): Promise<never> {
+	if (response.status === 401) {
+		const errorData = await response.json().catch(() => ({}))
+		const message = errorData.error?.message || 'The access token expired'
+		throw new TokenExpiredError('spotify', message)
+	}
+
+	throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+}
 
 export class SpotifyService {
 	private accessToken: string
@@ -21,7 +36,7 @@ export class SpotifyService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 
 		return response.json()
@@ -43,7 +58,7 @@ export class SpotifyService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 
 		return response.json()
@@ -89,7 +104,7 @@ export class SpotifyService {
 		)
 
 		if (!response.ok) {
-			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 
 		return response.json()
@@ -108,7 +123,7 @@ export class SpotifyService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 	}
 
@@ -132,7 +147,7 @@ export class SpotifyService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Spotify API error: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 	}
 
@@ -146,7 +161,7 @@ export class SpotifyService {
 		})
 
 		if (!userResponse.ok) {
-			throw new Error(`Failed to get user info: ${userResponse.status} ${userResponse.statusText}`)
+			await handleSpotifyError(userResponse)
 		}
 
 		const user = await userResponse.json()
@@ -166,7 +181,7 @@ export class SpotifyService {
 		})
 
 		if (!response.ok) {
-			throw new Error(`Failed to create playlist: ${response.status} ${response.statusText}`)
+			await handleSpotifyError(response)
 		}
 
 		return response.json()
@@ -191,7 +206,7 @@ export class SpotifyService {
 			})
 
 			if (!response.ok) {
-				throw new Error(`Failed to add tracks: ${response.status} ${response.statusText}`)
+				await handleSpotifyError(response)
 			}
 		}
 	}

@@ -136,6 +136,104 @@ const transferToYouTube = async (playlist) => {
 }
 ```
 
+### Token Expiry Handling
+
+**Problem**: OAuth2 access tokens expire after ~1 hour, causing API calls to fail with 401 errors. Without proper handling, users would see cryptic errors and wouldn't know to re-authenticate.
+
+**Solution**: Automatic token expiry detection and platform disconnection with user notification.
+
+#### Architecture
+
+**1. Custom Error Class** ([src/utils/apiErrors.ts](src/utils/apiErrors.ts)):
+```typescript
+export class TokenExpiredError extends Error {
+  constructor(
+    public platform: 'spotify' | 'google',
+    message = 'Access token has expired',
+  ) {
+    super(message)
+    this.name = 'TokenExpiredError'
+  }
+}
+```
+
+**2. Service-Level Detection** (in each platform service):
+- **SpotifyService**: All API methods check for 401 status codes
+- **YouTubeService**: Enhanced error handler checks 401 before quota detection
+- Throws `TokenExpiredError` when token is expired
+
+```typescript
+// Example from SpotifyService
+async function handleSpotifyError(response: Response): Promise<never> {
+  if (response.status === 401) {
+    const errorData = await response.json().catch(() => ({}))
+    const message = errorData.error?.message || 'The access token expired'
+    throw new TokenExpiredError('spotify', message)
+  }
+  throw new Error(`Spotify API error: ${response.status}`)
+}
+```
+
+**3. AuthStore Handler** ([src/stores/AuthStore.ts](src/stores/AuthStore.ts)):
+```typescript
+handleTokenExpiry(platform: Platform, message: string) {
+  console.log(`Token expired for ${platform}:`, message)
+
+  // Disconnect the platform (triggers localStorage cleanup via MobX reaction)
+  this.disconnectPlatform(platform)
+
+  // UI automatically updates since we're using MobX observers
+  // Components check authStore.connectedPlatforms to show re-auth prompt
+}
+```
+
+**4. Component-Level Handling**:
+All components that make API calls catch `TokenExpiredError`:
+
+```typescript
+try {
+  const spotifyService = new SpotifyService(accessToken)
+  const response = await spotifyService.getCurrentUserPlaylists()
+  setPlaylists(response.items)
+} catch (err) {
+  // Handle token expiry
+  if (err instanceof TokenExpiredError) {
+    authStore.handleTokenExpiry(err.platform, err.message)
+    return // Don't set error, auth system handles it
+  }
+
+  setError('Failed to load playlists')
+}
+```
+
+#### User Experience Flow
+
+1. **Token Expires**: User has been using the app for >1 hour
+2. **API Call Fails**: Next Spotify/YouTube API call returns 401
+3. **Service Detects**: Service throws `TokenExpiredError`
+4. **Component Catches**: Component catches error and calls `authStore.handleTokenExpiry()`
+5. **Platform Disconnected**: AuthStore sets platform to `null`, triggering localStorage cleanup
+6. **UI Updates**: MobX observer re-renders, showing connection buttons again
+7. **User Re-authenticates**: User clicks "Connect Spotify/YouTube" to re-authenticate
+8. **Session Restored**: User continues where they left off
+
+#### Benefits
+
+- ✅ **No manual token refresh logic** - simpler than implementing refresh token flow
+- ✅ **Consistent across platforms** - works for Spotify, YouTube, and future platforms
+- ✅ **Clear user feedback** - users see connection status and re-auth buttons
+- ✅ **Graceful degradation** - app doesn't crash, just requires re-connection
+- ✅ **Automatic cleanup** - localStorage and MobX state cleared automatically
+- ✅ **No stale tokens** - expired tokens never used for API calls
+
+#### Implementation Notes
+
+- **Service-scoped**: Each platform service handles its own error format
+- **Type-safe**: TypeScript ensures `TokenExpiredError.platform` matches the service
+- **Observable**: MobX ensures UI updates immediately when platform disconnects
+- **Persistent**: Disconnection triggers localStorage cleanup via MobX reactions
+- **Scalable**: Easy to add new platforms - just throw `TokenExpiredError` on 401
+
 ## 🎵 Playlist Transfer Process
 
 ### Step-by-Step Transfer

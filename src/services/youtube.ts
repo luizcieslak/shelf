@@ -4,6 +4,7 @@ import type {
 	YouTubePlaylistsResponse,
 	YouTubeSearchResponse,
 } from '../types/youtube'
+import { TokenExpiredError } from '../utils/apiErrors'
 import { parseYouTubeError } from '../utils/youtubeErrors'
 
 export class YouTubeService {
@@ -14,9 +15,17 @@ export class YouTubeService {
 	}
 
 	/**
-	 * Handle YouTube API errors with quota detection
+	 * Handle YouTube API errors with quota detection and token expiry
 	 */
 	private async handleError(response: Response): Promise<never> {
+		// Check for 401 first (token expiry) - throw TokenExpiredError for automatic disconnection
+		if (response.status === 401) {
+			const errorData = await response.json().catch(() => ({}))
+			const message = errorData.error?.message || 'The access token expired'
+			throw new TokenExpiredError('google', message)
+		}
+
+		// Otherwise use existing error handler for quota/other errors
 		const error = await parseYouTubeError(response)
 		throw new Error(error.userFriendlyMessage)
 	}

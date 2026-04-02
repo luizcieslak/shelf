@@ -89,7 +89,9 @@ export class PlaylistStore {
 							existingRecord.description !== data.description
 
 						if (needsUpdate) {
-							const record = await this.pb.collection('playlists').update<PlaylistRecord>(existingRecord.id, data)
+							const record = await this.pb
+								.collection('playlists')
+								.update<PlaylistRecord>(existingRecord.id, data)
 							savedRecords.push(record)
 						} else {
 							savedRecords.push(existingRecord)
